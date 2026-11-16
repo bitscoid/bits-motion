@@ -1,0 +1,313 @@
+# Render dan Verifikasi
+
+Baca file ini sebelum membangun dan me-render. Semua perintah di bawah adalah contoh; sesuaikan nama file dengan aset user. Jangan menjalankan perintah yang bergantung pada tool yang belum dicek ada.
+
+## Daftar isi
+1. Cek lingkungan
+2. Memilih pipeline render
+3. Mengukur dan menganalisis voiceover
+4. Menganalisis video referensi
+5. Menyusun frame secara deterministik
+6. Mixing audio dan ekspor
+7. Verifikasi file hasil ekspor
+8. Musik latar buatan sendiri
+9. Jebakan umum
+10. Bersih-bersih setelah serah terima
+
+## 1. Cek lingkungan
+
+Jalankan dulu, dan sesuaikan rencana dengan hasilnya:
+
+```bash
+ffmpeg -version | head -1; ffprobe -version | head -1
+ffmpeg -hide_banner -encoders 2>/dev/null | grep -E "(libx264|aac)" || echo "PERINGATAN: encoder libx264/aac tidak ditemukan"
+python3 -c "import PIL, numpy; print('PIL+numpy ok')"
+node -v
+fc-list | head -20          # font yang tersedia
+which espeak-ng pico2wave   # TTS offline (kemungkinan besar tidak ada)
+[ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API_KEY: ada" || echo "GEMINI_API_KEY: tidak ada"
+which curl yt-dlp           # curl untuk TTS, yt-dlp untuk unduh referensi via URL
+NC=$(timeout 8 curl -s -o /dev/null -w '%{http_code}' https://generativelanguage.googleapis.com/v1beta/models 2>/dev/null)
+case "$NC" in 200|403|404) echo "jaringan: OK (HTTP $NC)";; *) echo "jaringan: BERMASALAH (HTTP $NC / timeout)";; esac
+```
+
+Catatan: jaringan lingkungan kerja bisa dibatasi. Cek dulu apa yang bisa diakses: kalau `pip` dan `npm` jalan, font tambahan bisa lewat paket npm `@fontsource/<nama-font>`; kalau unduhan eksternal diblokir, pakai font yang sudah ada di sistem. Versi ffmpeg memengaruhi opsi yang boleh dipakai (lihat bagian 6).
+
+### Font siap pakai (terpasang di `~/.local/share/fonts/motion/`)
+
+Cek cepat: `fc-list | grep -iE "poppins|fredoka|caveat"` — kalau kosong, font belum terpasang (lihat troubleshooting bagian 6).
+
+Pilih sesuai mood video; satu video maksimal 2–3 family (satu display + satu pendukung, plus handwriting kalau perlu aksen):
+
+| Mood / gaya | Font | Keterangan |
+|---|---|---|
+| Modern, netral, UI-like | `Poppins` (Regular/SemiBold/Bold), `Inter`, `Montserrat` | Standar aman untuk narasi dan body text |
+| Playful, doodle, bulat ramah | `Baloo 2`, `Fredoka`, `Quicksand`, `Nunito` | Cocok topik ringan, edukasi santai, anak/muda |
+| Handwriting, catatan tangan | `Caveat`, `Patrick Hand`, `Indie Flower` | Aksen anotasi, garis panah, coretan |
+| Script elegan/retro | `Pacifico`, `Dancing Script` | Logo kata, judul santai — jangan untuk body text |
+| Impact, tipografi kinetis besar | `Bebas Neue`, `Anton`, `Archivo Black` | Kata kunci besar, hook, angka statistik |
+
+Cara pakai: di CSS/Remotion pakai nama family persis seperti di `fc-list` (mis. `"Baloo 2"`, `"Bebas Neue"`); di PIL pakai path file TTF langsung (`~/.local/share/fonts/motion/Baloo2.ttf`). Font variable (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) punya semua bobot dalam satu file — di CSS set `font-weight`; di PIL instantiate bobot dengan `ImageFont.truetype(..., size).set_variation_by_axes([weight])` atau pakai Poppins static untuk bobot pasti.
+
+## 2. Memilih pipeline render
+
+Prinsipnya: render setiap frame secara deterministik dari fungsi waktu `t = nomor_frame / 30`, lalu satukan dengan ffmpeg. Cara ini membuat jumlah frame pasti sama dengan durasi total × 30 dan animasi mudah disinkronkan dengan timeline.
+
+| Pipeline | Cocok untuk | Syarat |
+|---|---|---|
+| Python (Pillow/numpy, opsional cairosvg atau skia-python) | Teks, bentuk, gambar user, mask, parallax | PIL dan numpy |
+| HTML/CSS/JS + browser headless (screenshot per frame) | Tipografi kompleks, SVG, CSS blur dan bayangan | Browser headless tersedia dan bisa dijalankan |
+| Remotion / Node | Komposisi berbasis React | Node dan browser headless |
+| Filtergraph ffmpeg / MoviePy | Komposisi sederhana | ffmpeg |
+
+Pilih pipeline yang paling cocok dengan kebutuhan komposisi timeline, bukan yang kebetulan sudah terpasang. Kalau dependensinya belum ada, install dulu sebelum render:
+
+```bash
+pip install pillow numpy cairosvg     # pipeline Python
+npx playwright install chromium       # headless browser (HTML/CSS atau Remotion)
+npm install                           # dependensi proyek Remotion, lalu render dengan npx remotion render
+```
+
+Kalau instalasi gagal (jaringan diblokir, tanpa izin), berhenti dan laporkan ke user beserta alasannya. Jangan diam-diam turun ke pipeline yang lebih sederhana — kualitas visual menurun tanpa user sadar. Lanjut pakai pipeline sederhana hanya kalau user menyetujuinya setelah tahu konsekuensinya. Kalau benar-benar tidak ada yang bisa jalan, ikuti bagian "Kejujuran soal hasil" di SKILL.md.
+
+Simpan frame sebagai `frames/00000.png` sampai `frames/01199.png`. Untuk mengurangi memori, bisa juga di-pipe langsung ke ffmpeg (`-f rawvideo -pix_fmt rgb24 -s WxH -r 30 -i -`).
+
+## 3. Mengukur dan menganalisis voiceover
+
+Durasi asli:
+
+```bash
+ffprobe -v error -show_entries format=duration -of csv=p=0 "Suara Voiceover.mp3"
+```
+
+Jeda dan batas kalimat (turunkan `noise` kalau rekaman bising):
+
+```bash
+ffmpeg -i "Suara Voiceover.mp3" -af silencedetect=noise=-35dB:d=0.25 -f null - 2>&1 | grep silence_
+```
+
+Timing per kata: kalau ada alat ASR/forced alignment yang benar-benar bisa dijalankan, pakai itu. Kalau tidak, bagi waktu menurut batas jeda hasil `silencedetect`, lalu distribusikan kata di dalam tiap frasa secara proporsional menurut jumlah suku kata atau huruf. Katakan kepada user bahwa timing per kata adalah perkiraan.
+
+Catatan ekstensi: contoh di bawah memakai `Suara Voiceover.mp3`, tapi sesuaikan dengan file yang nyata ada — hasil generate TTS otomatis berupa `Suara Voiceover.wav`, rekaman user bisa .mp3/.wav/.m4a.
+
+Kalau durasi total hasil hitungan (durasi voiceover + ±2,5 detik) melebihi 60 detik, berhenti dan tanya user (lihat Tahap 4 di SKILL.md).
+
+Kalau user tidak punya voiceover, urutan pilihannya:
+
+1. **Generate lewat Gemini TTS** (butuh `GEMINI_API_KEY`; contoh pakai model `gemini-3.8-flash-tts`, kalau 404 cek daftar model TTS yang tersedia di docs Google):
+
+Tulis payload dengan `json.dumps` (JANGAN inline naskah ke curl `-d` — kutip/newline di naskah merusak JSON dan memicu 400 `INVALID_ARGUMENT`):
+
+```bash
+# Tulis naskah yang sudah disetujui ke naskah.txt dulu (boleh multiline, kutip bebas)
+# PENTING: buang label struktur seperti [Hook], [Inti 1], [Penutup] dari teks yang
+# dikirim ke TTS — model TTS membaca teks verbatim, label bisa ikut terbaca.
+# Simpan label di file terpisah sebagai peta timing scene, jangan di naskah.txt.
+
+python3 - <<'PY'
+import json
+naskah = open('naskah.txt').read()
+# WAJIB: text = verbatim SAJA, tanpa instruksi apa pun. Instruksi ala "Bacakan dengan
+# nada hangat..." DI DALAM text akan DIBACA KERAS-KERAS oleh model 3.8 (terbukti:
+# instruksi+3 kata = 6,5 dtk; verbatim 3 kata = 2,2 dtk). Nada/delivery lewat
+# speech_metadata.style — kanal resmi yang tidak ikut terbaca.
+payload = {
+    "contents": [{"parts": [{"text": naskah,
+        "speech_metadata": {"style": "hangat, jelas, dan sedikit bersemangat"}}]}],
+    "generationConfig": {
+        "responseModalities": ["AUDIO"],
+        "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Kore"}}}
+    }
+}
+json.dump(payload, open('vo_req.json','w'), ensure_ascii=False)
+PY
+
+curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent" \
+  -H "x-goog-api-key: $GEMINI_API_KEY" -H "Content-Type: application/json" \
+  -d @vo_req.json > vo.json
+
+python3 - <<'PY'
+import json, base64, sys
+d = json.load(open('vo.json'))
+if 'candidates' not in d:
+    sys.exit(f"TTS gagal, respons API: {json.dumps(d)[:500]}")
+part = d['candidates'][0]['content']['parts'][0]
+data = base64.b64decode(part['inlineData']['data'])
+mime = part['inlineData'].get('mimeType', '')
+open('vo.wav' if mime == 'audio/wav' else 'vo.pcm','wb').write(data)
+print('mimeType:', mime)
+PY
+# 3.8 mengembalikan audio/wav lengkap (RIFF header) — tulis langsung .wav.
+# Kalau mimeType audio/l16 (PCM mentah, model lama), baru decode manual:
+[ -f vo.pcm ] && ffmpeg -f s16le -ar 24000 -ac 1 -i vo.pcm "Suara Voiceover.wav" || cp vo.wav "Suara Voiceover.wav"
+```
+
+**Kalau dapat 400 `INVALID_ARGUMENT`**, baca pesan errornya di `vo.json`:- `No matching speaker voice found for name: X` → nama voice salah. Cek daftar voice resmi: `curl -s -H "x-goog-api-key: $GEMINI_API_KEY" "https://generativelanguage.googleapis.com/v1beta/models"` atau docs `ai.google.dev/gemini-api/docs/speech-generation#voices` (30 voice prebuilt, semua boleh dipakai).
+- `Invalid JSON payload received` → payload rusak, hampir pasti karena naskah di-inline ke string curl. Pakai pola `json.dumps` di atas.
+- Selain itu → cek `field_violations` di respons, perbaiki field yang disebut.
+
+Pilih voice sesuai topik. Beberapa voice yang bagus untuk narasi: `Kore` (tegas), `Puck` (ceria/upbeat), `Charon` (informatif), `Zephyr` (terang), `Leda` (muda/wanita). Tersedia 30 voice prebuilt (termasuk `Orus`, `Aoede`, `Enceladus`, dll — docs lama yang bilang tidak ada sudah basi). Nama voice case-sensitive. Kalau ragu, probe satu request dengan teks pendek. Sebutkan ke user voice apa yang dipakai. Hasilnya langsung masuk pipeline bagian 3 seperti rekaman user.
+
+**Sanity check setelah generate.** Bandingkan durasi hasil dengan perkiraan naskah (±2,2 kata/detik untuk Bahasa Indonesia; ambang ±35%). Selisih jauh lebih besar biasanya berarti ada teks non-naskah yang ikut dibacakan (instruksi, label `[Hook]`, placeholder) atau naskah terpotong: periksa `vo_req.json` — `text` harus berisi verbatim naskah saja — lalu regenerate sekali. Kalau tetap tidak masuk akal, beri tahu user sebelum lanjut ke timeline.
+
+**Mode opsional untuk timing presisi (per-frasa).** Kalau tipografi kinetik per kata sangat penting: pecah naskah jadi frasa, generate satu request per frasa, ukur tiap file dengan `ffprobe` sehingga batas waktu tiap frasa eksak, lalu gabungkan berurutan menjadi satu `Suara Voiceover.wav` (file teks concat + `ffmpeg -f concat -i list.txt -c copy` atau re-encode ke WAV). Trade-off: kuota free tier per model cuma 10 request/hari (terhitung per model, per project) — naskah panjang tidak realistis dipecah per frasa di free tier. Default tetap satu file utuh.
+
+Batas kuota free tier TTS: sekitar **10 request/hari per model** (bukan per menit). Kalau dapat HTTP 429 `RESOURCE_EXHAUSTED`, cek pesannya: kalau limit harian, jangan diulang hari itu — langsung fallback ke `gemini-3.8-flash-lite-tts` (model terpisah, kuota harian terpisah), sebutkan ke user kalau pakai fallback. Kalau kedua model habis, lanjut opsi 2 di bawah.
+
+2. **Tanpa API key / gagal**: jangan mengarang suara. Sarankan user membuat suara dari naskah dan memberikan file hasilnya (upload atau path). Kalau user minta draf tanpa suara, timing perkiraan boleh dihitung dari jumlah kata (sekitar 2,5 kata per detik), dengan label draf dan batas total tetap 60 detik.
+
+## 4. Menganalisis video referensi
+
+Referensi datang dari user (file atau URL) atau dicari sendiri di Pinterest (sub-bagian di bawah). Setelah file `Referensi Motion Graphic.mp4` ada, analisis:
+
+```bash
+ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of default=nw=1 "Referensi Motion Graphic.mp4"
+mkdir -p ref && ffmpeg -i "Referensi Motion Graphic.mp4" -vf "fps=2,scale=480:-1" ref/%03d.png
+
+# Contact sheet satu halaman untuk dibaca cepat
+ffmpeg -framerate 2 -i ref/%03d.png -vf "scale=320:-1,tile=6x5" ref/contact_sheet.png
+```
+
+Lihat frame hasil ekstrak (bisa disusun jadi contact sheet) untuk membaca palet, tipografi, komposisi, dan ritme potongan. Ambil prinsipnya, bukan salinannya. Orientasi dan rasio layar referensi menjadi default orientasi output.
+
+Kalau referensi berupa URL dari user, unduh dengan `yt-dlp "<url>" -o "Referensi Motion Graphic.mp4"` sebelum analisis.
+
+### Mencari referensi sendiri di Pinterest (kalau user tidak memberi)
+
+Kalau user tidak memberi file/URL referensi (atau memilih "serahkan ke AI"), cari sendiri video yang nyambung dengan topik:
+
+1. Cari kandidat pin video yang relevan dengan topik: pakai tool pencarian web yang tersedia dengan kueri seperti `pinterest.com pin <kata kunci topik> video` (coba bahasa Indonesia dan Inggris). Ambil 3–5 kandidat URL pin.
+2. Unduh kandidat satu per satu sampai ada yang berhasil:
+
+   ```bash
+   yt-dlp "<url-pin>" -o "Referensi Motion Graphic.mp4"
+   ```
+
+3. Saring sebelum dipakai — cek dengan `ffprobe`, buang kandidat yang: durasi < 5 detik atau > 90 detik, resolusi di bawah 720p, tidak punya stream video, atau isinya tidak berhubungan dengan topik. Kandidat gugur → lanjut ke berikutnya.
+4. Semua kandidat gagal → jangan mati-matian. Katakan pada user, lalu tanya: user carikan file/URL-nya sendiri, atau user beri arahan gaya singkat (palet, font, mood) untuk lanjut tanpa referensi. Tidak ada gaya bawaan — jangan melanjutkan tanpa acuan gaya.
+
+Kualitas hasil cari sendiri tidak terkontrol. Wajib: sebut ke user video referensi apa yang terpilih (URL dan alasan singkat) sebelum masuk analisis, dan jadikan inspirasi bukan cetakan sesuai aturan di atas.
+
+## 5. Menyusun frame secara deterministik
+
+- Tulis satu fungsi `render(t)` yang menggambar seluruh frame dari waktu saja, tanpa state tersembunyi atau angka acak yang berubah tiap panggilan (pakai seed tetap).
+- Definisikan fungsi easing (ease-out, ease-in-out, overshoot) dan pakai di semua animasi. Hindari gerak linear kecuali memang disengaja.
+- **Kewajiban gerak (gerbang QC, bukan pilihan):** di SETIAP detik video ada minimal satu elemen yang bergerak. Tidak boleh ada slide statis. Jika scene "diam", pakai kamera mikro: zoom drift ±2–4% atau geser ±10–20 px sepanjang scene. Kata kunci dan angka penting (mis. "92 juta") wajib pop skala (±15–25% + warna aksen) tepat saat kata diucapkan, dan skala WAJIB decay kembali ke 100% sebelum pop berikutnya — nilai overshoot yang menetap (mis. kata terus memakai skala 120%) membuat kata menimpa tetangganya. Slot lebar tiap kata diukur dengan font yang benar-benar dipakai (keyword ≠ body), dan kata yang muncul dua kali dalam satu scene punya waktu masing-masing — jangan dipetakan lewat dict per kata. Catatan desain idle motion: gerak POSISI elemen (geser x/y), bukan cuma perubahan radius/skala — lingkaran solid tanpa antialias yang hanya berdenyut radius sering tidak mengubah satu piksel pun; dan ukurannya minimal radius ±14 px / amplitudo ±10 px, kalau lebih kecil encoder (CRF 18+) bisa meng-quantize gerakan itu sampai hilang (lihat §9).
+- Rumus easing siap pakai: `easeOutCubic(u) = 1-(1-u)**3`; `easeInOutCubic(u) = u<0.5 ? 4*u**3 : 1-((-2*u+2)**3)/2`; overshoot: `1 + 2.7*(u-1)**3 + 1.7*(u-1)**2` (back-out, gunakan untuk pop masuk). Durasi animasi masuk elemen 0,3–0,6 dtk, transisi antar scene 0,3–0,5 dtk.
+- Ikon dan diagram digambar dari bentuk kode (donut, bar, briefcase, bohlam) — bukan teks atau emoji. Latar boleh bergantian antar scene (mis. terang/gelap) dengan satu warna aksen konsisten.
+- Motion blur bisa disimulasikan dengan merata-ratakan beberapa sub-frame pada waktu yang sedikit berbeda.
+- Render paralel dan bisa resume: karena frame deterministik, gambar dengan beberapa worker (mis. `multiprocessing`, 4–8 proses) dan lewati frame yang file PNG-nya sudah ada dan tidak kosong. Kalau render mati di tengah, jalankan ulang skrip yang sama — hanya frame yang hilang yang digambar ulang.
+- Pasang timeline dari tahap 5 sebagai data (daftar segmen dengan waktu mulai/selesai) supaya mudah disetel ulang.
+- Render frame 0 sampai (jumlah frame − 1). Frame terakhir harus tetap berisi visual penutup yang jelas, bukan layar kosong.
+
+## 6. Mixing audio dan ekspor
+
+Durasi video mengikuti voiceover. Hitung dulu durasi total dan jumlah frame (aturannya ada di Tahap 4 SKILL.md: suara + ±1 detik pembuka + ±1,5 detik penutup, dibulatkan ke atas ke detik penuh):
+
+```bash
+VO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "Suara Voiceover.mp3")
+DUR=$(awk -v v="$VO_DUR" 'BEGIN{t=v+2.5; d=int(t); if (d<t) d++; print d}')
+FRAMES=$((DUR*30))
+FADE_ST=$(awk -v d="$DUR" 'BEGIN{print d-2.5}')
+echo "voiceover=$VO_DUR  total=$DUR detik  frame=$FRAMES"
+[ "$DUR" -gt 60 ] && echo "MELEBIHI 60 DETIK: berhenti dan tanya user"
+```
+
+Pakai `$DUR` dan `$FRAMES` itu untuk seluruh render (jumlah frame yang digambar, timeline, dan ekspor). Voiceover digeser mulai di detik ke-1 (`adelay`), di-pad sampai akhir video, dan musik diloop lalu dipotong sepanjang video, diturunkan volumenya, di-duck saat ada suara, dan fade-out 2,5 detik di akhir.
+
+Contoh lengkap (voiceover + musik):
+
+```bash
+ffmpeg -y -framerate 30 -i frames/%05d.png \
+  -i "Suara Voiceover.mp3" \
+  -stream_loop -1 -i "Musik Latar.mp3" \
+  -filter_complex "\
+[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,asetpts=PTS-STARTPTS,loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[vo1][vo2];\
+[2:a]atrim=0:$DUR,asetpts=PTS-STARTPTS,volume=0.35,afade=t=out:st=$FADE_ST:d=2.5[bg];\
+[bg][vo1]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[duck];\
+[duck][vo2]amix=inputs=2:duration=longest:dropout_transition=0,volume=2,alimiter=limit=0.85:level=0[aout]" \
+  -map 0:v -map "[aout]" \
+  -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -r 30 -frames:v $FRAMES \
+  -c:a aac -b:a 192k -ar 48000 -t $DUR \
+  -movflags +faststart "output.mp4"
+```
+
+Catatan:
+- `loudnorm` menyetaraan loudness voiceover (target I=-16 LUFS, TP=-1,5) supaya level rekaman user dan hasil TTS konsisten. Filter ini bekerja pada 192 kHz secara internal; `-ar 48000` pada output sudah mengembalikan sample rate.
+- `amix` pada ffmpeg 6.x selalu menormalkan dengan membagi volume per jumlah input, makanya ada `volume=2` untuk mengembalikan level. Opsi `normalize=0` baru ada di ffmpeg 7.0 ke atas; pakai hanya kalau `ffmpeg -version` menunjukkan versi itu.
+- Tanpa musik: hapus input musik dan cabang `[bg]`, lalu pakai `[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,loudnorm=I=-16:TP=-1.5:LRA=11,afade=t=out:st=<DUR-0.5>:d=0.5[aout]` (hitung `DUR-0.5` dengan `awk` seperti `FADE_ST`).
+- Tanpa voiceover (draf): gunakan hanya musik, dan beri label draf.
+- Kalau yang diinput video mentah dan bukan urutan gambar, tetap paksa `-r 30` dan `-frames:v $FRAMES`.
+- Kalau user menentukan target durasi sendiri, ganti nilai `DUR` dengan target itu (selama voiceover muat dan tidak lebih dari 60), lalu hitung `FRAMES` dan `FADE_ST` dengan rumus yang sama.
+
+## 7. Verifikasi file hasil ekspor
+
+Jangan mengandalkan durasi yang tampil di editor atau skrip. Ukur file MP4-nya:
+
+```bash
+# durasi container, codec, resolusi, fps, jumlah frame
+ffprobe -v error -show_entries format=duration:stream=codec_type,codec_name,width,height,r_frame_rate,avg_frame_rate,duration,nb_frames -of default=nw=1 output.mp4
+
+# hitung frame yang benar-benar terbaca (harus sama dengan $FRAMES)
+ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 output.mp4
+```
+
+Target: container ≈ `$DUR` detik (tepat sampai tiga angka desimal), `$FRAMES` frame video, 30 fps, H.264 + AAC, resolusi sesuai rencana. Encoder AAC menambah sedikit padding sehingga durasi stream audio bisa berbeda beberapa milidetik; yang dipakai sebagai bukti adalah durasi container dan jumlah frame video. Laporkan angka sebenarnya ke user. Kalau meleset, perbaiki dan ekspor ulang, jangan dibulatkan di laporan.
+
+Deteksi masalah yang tidak disengaja:
+
+```bash
+# frame hitam
+ffmpeg -i output.mp4 -vf blackdetect=d=0.1:pix_th=0.05 -an -f null - 2>&1 | grep black_
+# frame beku — ambang n=0: hanya frame benar-benar identik yang dihitung freeze.
+# JANGAN pakai n=-60dB: di grafis flat, perubahan mikro antar frame (ribuan piksel,
+# max diff ~220) tetap dilaporkan sebagai freeze → false positive pada video yang jelas bergerak.
+ffmpeg -i output.mp4 -vf freezedetect=n=0:d=1.0 -an -f null - 2>&1 | grep freeze_
+# keheningan tak disengaja dan level volume
+ffmpeg -i output.mp4 -af silencedetect=noise=-50dB:d=0.5 -vn -f null - 2>&1 | grep silence_
+ffmpeg -i output.mp4 -af volumedetect -vn -f null - 2>&1 | grep -E "mean_volume|max_volume"
+```
+
+**Gerbang QC gerak:** hasil `freezedetect=n=0:d=1.0` harus kosong, kecuali jeda statis yang sengaja dan tercatat di timeline (maksimal 1 jeda, ≤1,5 dtk, di penutup). Kalau ada freeze berarti render benar-benar diam — kembali ke §5, tambahkan kamera mikro atau animasi elemen, render ulang. Lapor hasil gerbang ini ke user bersama angka durasi.
+
+Dua hal yang bikin gerbang ini salah kepikiran:
+- `freezedetect` dengan `n=-60dB` (nilai default) FALSE POSITIVE di motion graphic: decoded frame di rentang "freeze" bisa berubah ribuan piksel per frame (elemen idle, dot napas) tapi filter tetap bilang freeze karena ambangnya terlalu tinggi untuk grafis flat. Selalu pakai `n=0`.
+- Frame sumber bergerak tapi MP4 terdeteksi freeze di titik yang sama? Itu encoder: elemen kecil (radius <15 px, gerak <10 px/frame) di area flat besar bisa ter-quantize hilang di CRF 18+. Perbesar elemen idle atau turunkan CRF ke 16, bukan tambah gerakan baru.
+
+`max_volume` yang menyentuh 0 dB berarti risiko clipping — dan kalau `alimiter` sudah dipasang tapi max tetap 0 dB, penyebabnya hampir pasti opsi `level` bawaan (lihat §9).
+
+Cek visual: ekstrak frame di titik-titik kunci (awal, tiap pergantian scene, akhir) dan lihat sendiri apakah teks terbaca, ejaan benar, aset tidak terpotong, dan tidak ada elemen bertabrakan.
+
+```bash
+ffmpeg -i output.mp4 -vf "fps=1/2,scale=640:-1" check/%02d.png
+ffmpeg -ss $(awk -v d="$DUR" 'BEGIN{print d-0.1}') -i output.mp4 -frames:v 1 check/last.png
+```
+
+## 8. Musik latar buatan sendiri
+
+Hanya kalau user tidak menyediakan musik. Buat pad ambient sederhana dengan numpy atau `aevalsrc`/`sine` dari ffmpeg: beberapa nada akor yang bertumpuk dengan volume pelan, ditambah denyut ringan di tempo yang pas dengan ritme visual (misalnya 100–120 BPM) bila ingin aksen beat. Ekspor sebagai WAV 48 kHz, lalu masukkan ke mix di atas.
+
+Katakan terus terang ke user bahwa ini musik sintetis sederhana, bukan komposisi profesional, dan sarankan musik bebas royalti bila ingin hasil lebih kaya.
+
+Opsional, efek suara sintetis hemat untuk transisi, misalnya whoosh:
+
+```bash
+ffmpeg -f lavfi -i "anoisesrc=d=0.4:c=pink:a=0.5" -af "afade=t=in:d=0.1,afade=t=out:st=0.2:d=0.2,volume=0.3" -ar 48000 whoosh.wav
+```
+
+Pakai maksimal beberapa kali per video, volumenya selalu di bawah voiceover, dan sebutkan ke user bahwa ini SFX sintetis.
+
+## 9. Jebakan umum
+
+- **VFR (variable frame rate)**: paksa CFR dengan `-r 30`. Cek `r_frame_rate` dan `avg_frame_rate` sama-sama 30/1.
+- **Durasi kurang atau lebih satu frame**: biasanya karena jumlah frame yang dirender tidak sama dengan `DUR × 30`. Hitung ulang sebelum encode.
+- **Audio lebih panjang dari video** (atau sebaliknya): pakai `apad=whole_dur=$DUR` dan `atrim=0:$DUR` seperti di contoh, plus `-t $DUR`.
+- **Font tidak ditemukan**: cek `fc-list`, atau unduh lewat `npm`, jangan diam-diam jatuh ke font bawaan yang jelek.
+- **Teks Bahasa Indonesia terpotong di tepi**: ukur lebar teks dengan fungsi pengukur font, bukan menebak.
+- **File sangat besar**: naikkan CRF (misalnya 20–22), jangan menurunkan resolusi.
+- **`alimiter` dipasang tapi `max_volume` tetap 0 dB**: opsi `level` bawaan alimiter adalah 1 (auto-level) — setelah membatasi, sinyal dinormalisasi BALIK ke 0 dBFS. Wajib `alimiter=limit=0.85:level=0`. Terbukti: `limit=0.79` saja tetap menghasilkan max 0,0 dB; dengan `level=0` hasilnya -1,3 dB.
+- **Elemen idle kecil kena quantize encoder**: dot/particle radius <15 px yang cuma berdenyut di area flat besar bisa hilang setelah encode (CRF 18+), sehingga frame decoded jadi identik → freeze nyata di MP4 padahal renderer menggambar gerakan. Perbesar elemen (radius ≥14 px, amplitudo geser ≥10 px), dan gerak posisinya, bukan cuma radius-only (perubahan radius lingkaran solid tanpa antialias sering tidak mengubah piksel mana pun).
+
+## 10. Bersih-bersih setelah serah terima
+
+`frames/`, `ref/`, `check/`, `vo.json`, dan `vo.pcm` bisa gigabyte-an dan tidak dibutuhkan user. Setelah MP4 terverifikasi dan diserahkan, hapus semua itu; simpan hanya MP4 + kode sumber render (dan aset user) di project dir. Sebutkan di pesan serah terima kalau file perantara sudah dibersihkan.
