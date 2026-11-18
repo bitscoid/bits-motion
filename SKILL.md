@@ -110,18 +110,20 @@ One separator only: **the hyphen**. Spaces force shell quoting; underscores are 
 4. **Strip these characters from titles**: `? ! : ; / \ * " < > |` and trailing dots; spaces become hyphens.
 5. **Folder already exists → ask.** Never overwrite, never append `-2`. Videos get re-rendered many times; stacked copies leave the user unsure which is current.
 
-### Incoming asset names
+### Incoming assets
 
 Normalise what the user hands over; never leave their filenames in place:
 
-| User provides | Lands at |
+| What arrives | Lands at |
 |---|---|
-| voiceover recording, any format (`narasi.mp3`, `vo.m4a`, `Suara Voiceover.wav`) | `audio/voiceover.wav`, normalised to 48 kHz mono |
-| background music (`bgm.mp3`, `Musik Latar.wav`) | `audio/music.wav` |
-| style reference video (file or URL) | `assets/reference.mp4` |
-| supporting image N | `assets/image-01.png`, `image-02.png`, … |
+| Voiceover recording, any format | `audio/voiceover.wav`, normalised to 48 kHz mono |
+| Background music, any format | `audio/music.wav` |
+| Style reference video, file or URL | `assets/reference.mp4` |
+| Supporting images, in the order given | `assets/image-01.png`, `image-02.png`, … |
 
-Record the original name and mention it in the delivery message so the user can trace which file was used. If a file's role is unclear, **ask once** — do not guess and discard.
+Identify incoming files by **type and content**, never by filename. A file called `recording-01.m4a` and one called `voice-final.mp3` are the same thing: probe it with `ffprobe`, check it holds speech, and name it by role.
+
+If two candidates could both be the voiceover, or a file's role stays unclear after probing, **ask once** — never guess and discard. Record the original filename and mention it in the delivery message so the user can trace which file was used.
 
 ### What this workflow does not create
 
