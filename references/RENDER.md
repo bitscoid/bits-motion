@@ -40,7 +40,9 @@ Stages 4 and 7 need the model to open an image. Provider metadata is not evidenc
 ```bash
 # known-content probe: white 800x400, blue square, red circle, text X7-KILO
 python3 - <<'PY'
+import os
 from PIL import Image, ImageDraw
+os.makedirs("work", exist_ok=True)   # work/ may not exist yet at this point
 im = Image.new("RGB", (400, 200), "white"); d = ImageDraw.Draw(im)
 d.rectangle([20, 20, 120, 120], fill=(0, 0, 255))
 d.ellipse([140, 20, 240, 120], fill=(255, 0, 0))
@@ -63,7 +65,7 @@ Batch several images into one delegated call. Timing, scene code, rendering, and
 
 Quick check: `fc-list | grep -iE "poppins|fredoka|caveat"` — empty means not installed (see *Adding a new font* below).
 
-Match to the video's mood; at most 2–3 families per video (one display + one supporting, plus handwriting if it needs an accent):
+Match to the video's mood; **2–3 families is the usual range** (one display + one supporting, plus handwriting if it needs an accent) — a working default, not a hard cap:
 
 | Mood / style | Fonts | Notes |
 |---|---|---|
@@ -76,7 +78,9 @@ Match to the video's mood; at most 2–3 families per video (one display + one s
 | Technical / data / mono | `JetBrains Mono`, `Space Mono`, `Space Grotesk`, `IBM Plex Mono`, `Sora`, `Epilogue` | Small labels, statistics, data and tech feel |
 | Expressive / display | `Bricolage Grotesque`, `Shrikhand`, `Unbounded`, `Syne` | Titles that carry personality — use once per video, never for body |
 
-Mix across categories freely, but only 2–3 families per video. The catalogue exists to widen the range of moods available, not to prescribe which one to pick.
+Mix across categories freely. **2–3 families is the range that usually reads as one system**; more rarely does, but a concept that needs a fourth voice is a decision to make, not a rule breaking. The catalogue exists to widen the range of moods available, not to prescribe which one to pick.
+
+For a script the catalogue does not cover (Arabic, Devanagari, CJK, Thai), download a family that supports it and verify **shaping**, not just glyph presence. PIL needs a Raqm-enabled build for correct Arabic and Indic joining (`ImageFont.Layout.RAQM`), and a font that only renders isolated forms ships broken text. Test a real sentence from the script before building a scene around it.
 
 Usage: in CSS/Remotion use the family name exactly as `fc-list` reports it (e.g. `"Baloo 2"`, `"Bebas Neue"`); in PIL use the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`). Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file — set `font-weight` in CSS, or in PIL call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
 
@@ -144,9 +148,11 @@ npm install                           # Remotion project deps, then npx remotion
 
 If installation fails (blocked network, no permission), stop and report it with the reason. Never silently drop to a simpler pipeline — visual quality degrades without the user knowing. Only continue with a simpler pipeline once the user agrees after hearing the consequences. If nothing runs at all, follow "Honesty about the result" in `SKILL.md`.
 
+`package.json`, `tsconfig.json`, `.npmrc` and `node_modules/` are tool configuration, not project documents — create them when the pipeline needs them. The ban on extra files is about parallel sources of truth (`timing.json`, `scenes.py`, `manifest.json`), not about the toolchain.
+
 Store frames as `work/frames/00000.png` through `work/frames/01199.png`. To save memory you can pipe straight into ffmpeg (`-f rawvideo -pix_fmt rgb24 -s WxH -r 30 -i -`).
 
-The build script is `render.<ext>` — `render.py` for the Python pipeline, `render.mjs` for Remotion, and so on. Same file, extension follows the pipeline; never carry two entry points.
+The build script is `render.<ext>` — `render.py` for the Python pipeline, `render.mjs` for Remotion, and so on. Same file, extension follows the pipeline; never carry two entry points. Helper modules (`lib/`, `make_music.py`) are fine as long as `render.<ext>` is the only thing you run end to end.
 
 ## 3. Measuring and analysing the voiceover
 
@@ -155,6 +161,20 @@ Duration:
 ```bash
 ffprobe -v error -show_entries format=duration -of csv=p=0 "audio/voiceover.wav"
 ```
+
+A user recording may already carry its own lead-in. Measure it before trusting the duration:
+
+```bash
+python3 - <<'PY'
+import wave, numpy as np
+w = wave.open("audio/voiceover.wav")
+a = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+i = int(np.argmax(np.abs(a) > 800))
+print(f"lead silence {i / w.getframerate():.2f} s")
+PY
+```
+
+If it exceeds 0.3 s, trim it to 0.2 s of air and re-measure. `VO_DELAY` stays the single 1 s lead-in; a second lead-in baked into the file is dead air the audio gate does not look for.
 
 Pauses and sentence boundaries (lower `noise` for noisy recordings):
 
@@ -169,7 +189,9 @@ Try ASR with per-word timestamps before giving up on estimation. `faster-whisper
 ```python
 from faster_whisper import WhisperModel
 m = WhisperModel("small", device="cpu", compute_type="int8")
-segs, _ = m.transcribe(audio_array, language="id", word_timestamps=True)
+segs, _ = m.transcribe(audio_array, language=None, word_timestamps=True)
+# language=None auto-detects. Pin it (language="id") only when the script is Indonesian
+# and detection is unreliable -- forcing the wrong language corrupts every word boundary.
 # segs[i].start/.end per sentence; segs[i].words[j].word/.start/.end per word
 ```
 
@@ -192,12 +214,15 @@ Write the result to `audio/words.json` — it is the one artefact every later st
 ```python
 import json
 json.dump({
-    "vo_delay": 1.0,
+    "vo_delay": 1.0,          # the same single constant as VO_DELAY -- never re-typed per scene
     "segments": [{"start": s.start, "end": s.end, "text": s.text,
+                  "text_display": align_from_script(s),   # script.txt spelling, same sentence
                   "words": [{"word": w.word, "start": w.start, "end": w.end}
                             for w in s.words]} for s in segs]
 }, open("audio/words.json", "w"), ensure_ascii=False, indent=1)
 ```
+
+`text_display` is the sentence as `script.txt` spells it, aligned to the ASR segment (token index is enough; a fuzzy match when ASR splits or merges a word). The ASR `text` stays exactly as recognised because only its boundaries matter — but it must never reach a subtitle or the publish copy.
 
 `audio/`, not `work/`. Re-running ASR after a cleanup produces timestamps that differ by ~±0.1 s from the ones the pictures were synced to, so a rewrite of this file silently desyncs a re-render. Sitting beside `voiceover.wav` makes it a durable project input rather than a disposable intermediate.
 
@@ -213,9 +238,10 @@ def ts(t):
 
 d = json.load(open("audio/words.json"))
 off = d["vo_delay"]                            # read the delay, never re-type it
-# one cue per sentence, shifted onto the video timeline
+# one cue per sentence, shifted onto the video timeline.
+# Use text_display (script spelling), never g['text'] (ASR spelling is kept wrong on purpose).
 open("output/<slug>.srt", "w").write("".join(
-    f"{i}\n{ts(g['start'] + off)} --> {ts(g['end'] + off)}\n{g['text'].strip()}\n\n"
+    f"{i}\n{ts(g['start'] + off)} --> {ts(g['end'] + off)}\n{g['text_display'].strip()}\n\n"
     for i, g in enumerate(d["segments"], 1)))
 ```
 
@@ -286,8 +312,13 @@ else:
     print('legacy: mimeType', mime)
 PY
 # Unary requests return complete WAV. For audio/l16 (raw PCM, streaming or older
-# models) decode manually: 24 kHz, mono, s16le.
-[ -f work/tts.pcm ] && ffmpeg -f s16le -ar 24000 -ac 1 -i work/tts.pcm "audio/voiceover.wav" || cp work/tts.wav "audio/voiceover.wav"
+# models) decode manually: 24 kHz, mono, s16le. Either path normalises to the
+# project format: 48 kHz mono.
+if [ -f work/tts.pcm ]; then
+  ffmpeg -v error -y -f s16le -ar 24000 -ac 1 -i work/tts.pcm -ar 48000 "audio/voiceover.wav"
+else
+  ffmpeg -v error -y -i work/tts.wav -ar 48000 -ac 1 "audio/voiceover.wav"
+fi
 ```
 
 **On 400 `INVALID_ARGUMENT`**, read the error in `work/tts-response.json`:
@@ -307,36 +338,102 @@ Free-tier quota: roughly **10 requests/day per model** (not per minute). On HTTP
 
 ## 4. Analysing a reference video
 
-The reference comes from the user (file or URL) or is found on Pinterest (subsection below). Once `assets/reference.mp4` exists, analyse it:
+The reference comes from the user (file or URL) or is found on Pinterest (subsection below). For a URL from the user, download with `yt-dlp "<url>" -o "assets/reference.mp4"` before analysing. Once the file exists, read it in four steps: a **contact sheet** for the design layers, **motion strips** for the temporal ones, an eight-layer read, and a brief written into the build script. A still cannot show easing, entry duration or text granularity — those only exist in consecutive frames.
 
 ```bash
-ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of default=nw=1 "assets/reference.mp4"
-mkdir -p work/ref && ffmpeg -i "assets/reference.mp4" -vf "fps=2,scale=480:-1" work/ref/%03d.png
-
-# single-page contact sheet for fast reading
-ffmpeg -framerate 2 -i work/ref/%03d.png -vf "scale=320:-1,tile=6x5" work/ref/contact.png
+REF="assets/reference.mp4"
+ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of default=nw=1 "$REF"
 ```
 
-Read the extracted frames (a contact sheet works well) for palette, typography, composition, and cut rhythm. Take principles, not copies. The reference's orientation and aspect become the default output orientation.
+The reference must match the orientation chosen in stage 1 — a mismatch fails the filter below and never changes `MAX_DUR`.
 
-Cut rhythm is measurable — do not rely on impression. Count the actual cuts and their spacing, then decide whether to sit near or against that rhythm:
+### Pass 1 — contact sheet over the whole clip
 
 ```bash
-# scene changes (threshold 0.3 = a real cut, not a fade)
-ffmpeg -i "assets/reference.mp4" -vf "select='gt(scene,0.3)',showinfo" -an -f null - 2>&1 \
-  | grep -o "pts_time:[0-9.]*" | cut -d: -f2 \
-  | awk 'NR==1{printf "first cut at %.2fs\n", $1; p=$1; next}
-         {printf "cut at %.2fs (gap %.2fs)\n", $1, $1-p; p=$1; g+=$1-p; n++}
-         END{if(n) printf "average gap %.2fs over %d gaps\n", g/n, n}'
+RDUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$REF")
+
+# ~60 thumbnails across the whole clip, never coarser than one every 2 s
+DIMS=$(python3 -c "import math; d=max(float('$RDUR'),1); f=min(2.0, 60/d); c=max(1, round(d*f)); print(f'{f:.3f} {math.ceil(math.sqrt(c))}')")
+FPS=${DIMS% *}; GRID=${DIMS#* }
+
+mkdir -p work/ref
+ffmpeg -i "$REF" -vf "fps=$FPS,scale=240:-1,tile=${GRID}x${GRID}" -frames:v 1 -update 1 work/ref/contact.png
 ```
 
-Average gap plus the shortest and longest gap describe the pace in numbers; that is what you match or deliberately break.
+The grid is sized from the clip's duration. A fixed `tile=6x5` at `fps=2` covers the first **15 s** of any clip and then fails on the remaining tiles (`Cannot write more than one file with the same name`), leaving a sheet that shows only the opening — measured on a 60 s reference: 120 frames extracted, 30 cells on the sheet, exit code 234. `-frames:v 1` and `-update 1` are both required: a tile grid is one image written to one filename.
 
-For a URL from the user, download with `yt-dlp "<url>" -o "assets/reference.mp4"` before analysing.
+### Pass 2 — motion strips around three cuts
+
+Cut rhythm is measurable — do not rely on impression. Detect the cuts, keep the first, middle and last, then take a strip across each one:
+
+```bash
+# scene changes (threshold 0.3 = a real cut, not a fade). No -v flag: showinfo logs at info level.
+ffmpeg -i "$REF" -vf "select='gt(scene,0.3)',showinfo" -an -f null - 2>&1 \
+  | grep -o "pts_time:[0-9.]*" | cut -d: -f2 > work/ref/cuts.txt
+
+awk 'NR==1{f=$1} {a[NR]=$1; n=NR}
+     END{if(!n){print "no cuts found" > "/dev/stderr"; exit}
+         printf "%s\n", f
+         if(n>2) printf "%s\n", a[int((n+1)/2)]
+         if(n>1) printf "%s\n", a[n]}' work/ref/cuts.txt > work/ref/pick.txt
+
+# 0.5 s before each cut, 1.0 s after: 45 frames in a 15x3 tile
+while read -r T; do
+  S=$(awk -v t="$T" 'BEGIN{x=t-0.5; if(x<0)x=0; printf "%.3f", x}')
+  ffmpeg -ss "$S" -i "$REF" -t 1.5 -vf "fps=30,scale=200:-1,tile=15x3" \
+    -frames:v 1 -update 1 "work/ref/strip-$T.png"
+done < work/ref/pick.txt
+```
+
+Average gap plus the shortest and longest gap describe the pace in numbers; that is what you match or deliberately break. From each strip read: how many frames an element takes to land (8 and 20 are different videos), the easing shape, whether text arrives per letter, per word or per line, whether there is overshoot, and whether the frame is already still before the cut.
+
+`showinfo` writes at info level — adding `-v error` silences the very lines this pipeline greps, and an empty `cuts.txt` then reads as "a reference with no cuts".
+
+### Pass 3 — the eight-layer read
+
+Read the sheet and the strips layer by layer. Every layer answers one question and produces one line of code. "Warm palette" is not a reading; "70% near-black, 20% cream, 10% orange, orange on one word per frame" is.
+
+| Layer | What to read | Translation to code |
+|---|---|---|
+| **Palette** | roles (ground / ink / accent), the share of frame each holds, whether the accent marks one word or a whole field, whether the palette shifts between chapters, texture over the colour | a hex per role, an area budget, a background per section, a grain amount |
+| **Typography** | title-to-meta size ratio, families and the axis varied (weight, width, case), tracking on caps, and whether type is used as an image — cropped, stacked, outlined, filled, off-frame | a size table, tracking values, crop masks |
+| **Composition** | empty-space ratio, where the mass sits, layer count, full-bleed vs card | margins, anchor points, z-order |
+| **Graphic language** | shape vocabulary, corner radius, stroke weight, fill style, icon grid, diagram grammar (bars, arcs, arrows, axis style), illustration register (flat, outline, collage, isometric), texture | `rounded_rectangle(r=16)`, `line(width=3)`, icon grid 24, grain 4% |
+| **Motion** | entry duration in frames, easing shape, overshoot, what moves (camera, world, or layers), text granularity, secondary motion, morph/mask, whether motion carries meaning or decorates | an easing constant, a duration in frames, a stagger per word or line |
+| **Rhythm** | cut distribution (not just the mean — the shortest and longest gap matter most), event density per second, the energy curve, whether cuts land on speech or on music | expected cut count, where holds go |
+| **Sound** | whoosh / impact / riser / tick vocabulary, silence as punctuation, whether music drops under the key line | an SFX plan per transition type |
+| **Attention** | what is on screen at 1.5 s and how many elements, the chapter system, withholding (what is held back and when it is released), pattern-interrupt interval, callbacks in the close | hook frame contents, chapter cards, interrupt spacing |
+
+Two closing reads, both required:
+
+- **Signature device.** Name the one or two things that are this reference's fingerprint — text always entering from behind an object, a hairline that grows into a diagram, numbers counting up. Write the principle, not the form, and then use it differently.
+- **Weakness.** Name what the reference does badly — too much text, a flat middle, a weak close. That is where the build beats it.
+
+The reference is a **floor, not a ceiling**. At least one decision — a motif, a material, a motion idea from another medium — must come from the topic and be absent from the reference. A build that only matches its reference is a copy with extra steps.
+
+### Pass 4 — write the brief into `render.<ext>`
+
+Ten lines, written before the first scene and kept as the header comment of the build script — not a separate file (`SKILL.md` → *Project layout*: one source of truth). Update a line when a decision changes; stage 7 checks the export against it.
+
+```python
+# STYLE BRIEF — reference: <url> (read <date>)
+# palette  : ground #0B0B0F 70% | ink #F5F1EA 20% | accent #C6492B 10%, one word per frame
+# type     : <display> 900 / <meta> 500; title:meta 6:1; caps tracking 6 px
+# layout   : mass left, 55% empty; full-bleed, no cards
+# graphics : rounded rect r=16, stroke 2 px, grain 4%, line icons 3 px on a 24 grid
+# motion   : entry 8-12 frames ease-out, no overshoot; text per word; camera locked, layers drift
+# rhythm   : cuts 0.9-1.4 s, one 2.6 s hold before the close; land on speech, not music
+# sound    : whoosh 120 ms on mask transitions; music drops under the verdict line
+# attention: hook = one object + one word at frame 0; chapters 01-03; circle callback at the close
+# device   : <name> in principle — this build uses it <differently>
+# floor    : <the one decision not taken from the reference>
+```
+
+A brief that could describe any motion-graphics video has not been read — it is a template. Each line has to be specific enough that another build could not use it.
 
 ### Finding a reference on Pinterest (when the user gives none)
 
-If the user supplies no reference file or URL (or asks for everything automatic), searching is **mandatory before self-design** — the budget and failure modes are specified in `SKILL.md` stage 3 and apply here verbatim: ≥5 pin candidates across ≥2 searches, one download attempt at a time, discard by the filter below, report each failure in one line. Known failure modes measured in the wild: image-only pins (`No video formats found!`), Vimeo-embedded pins (often TLS-blocked per environment), and 4 s loops that fail the minimum-duration filter. Only after the budget is exhausted: design the style yourself and say so, including that the search was attempted.
+If the user supplies no reference file or URL (or asks for everything automatic), searching is **mandatory before self-design** — the budget and failure modes are specified in `SKILL.md` stage 3 and apply here verbatim: ≥5 pin candidates across ≥2 searches as the floor, ~8 as the working target, one download attempt at a time, discard by the filter below, report each failure in one line. Known failure modes measured in the wild: image-only pins (`No video formats found!`), Vimeo-embedded pins (often TLS-blocked per environment), and 4 s loops that fail the minimum-duration filter. Only after the budget is exhausted: design the style yourself and say so, including that the search was attempted.
 
 Search in this order — do not stop at the first failure:
 
@@ -351,7 +448,7 @@ Download candidates one at a time until one works:
 yt-dlp "<pin-url>" -o "assets/reference.mp4"
 ```
 
-Filter before use — check with `ffprobe` and discard candidates that: run under 5 s or over 90 s, have the wrong aspect ratio, have no video stream, or are visually unusable. Discarded → try the next.
+Filter before use — check with `ffprobe` and discard candidates that: run under 5 s or over 180 s (three minutes is enough to read a style; longer only costs analysis time), have the wrong aspect ratio, have no video stream, or are visually unusable. Discarded → try the next.
 
 **Aspect ratio, not resolution.** A reference teaches style — palette, typography, composition, cut rhythm — and every one of those reads perfectly from a smaller frame. 720×1280 is a valid reference for a 1080×1920 build, and 1280×720 for a 1920×1080 build: same orientation, same 9:16 (or 16:9) geometry. What matters when comparing:
 
@@ -397,14 +494,14 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
 
 - Write one `render(t)` function that draws the whole frame from time alone, with no hidden state and no randomness that changes between calls (use a fixed seed).
 - Define easing functions (ease-out, ease-in-out, overshoot) and use them throughout. Avoid constant speed unless it is deliberate.
-- **Motion is required (QC gate, not optional):** every second of video has at least one moving element. No static slide is allowed. If a scene is "still", apply micro camera motion (zoom drift or a gentle pan across the scene). Keywords and important figures (e.g. "92 juta") must get a motion emphasis right as the word is spoken — the amount and form of that emphasis is taste (scale pop, colour, weight, position, or a combination), and the scale MUST decay back to 100% before the next pop; a persistent overshoot (e.g. a word stuck at 120%) makes it collide with neighbours. Measure each word's width slot with the font actually used (keyword ≠ body); a word appearing twice in one scene needs its own time for each appearance — never map both through one dict entry. Encoder note: element POSITION motion (x/y shift) is more reliable than radius/scale alone — a solid antialias-free circle that merely pulses in radius often changes not a single pixel, and motion under ~10 px can be quantised away at CRF 18+ (§9).
+- **Motion is what the encoder can see.** Every second needs at least one element whose **position** actually changes — an idle element can drift or pan instead of pulsing. This is an encoding requirement, not a ban on held frames: a documented hold is a legitimate edit (`GUIDE.md` §3). Keywords and important figures (e.g. "92 juta") take a motion emphasis as the word is spoken — the amount and form is taste (scale pop, colour, weight, position, or a combination). If two words share a line, a scale pop must decay back to 100% before the next one, or they collide; a keyword that owns its frame may hold its scale. Measure each word's width slot with the font actually used (keyword ≠ body); a word appearing twice in one scene needs its own time for each appearance — never map both through one dict entry. Encoder note: element POSITION motion (x/y shift) is more reliable than radius/scale alone — a solid antialias-free circle that merely pulses in radius often changes not a single pixel, and motion under ~10 px can be quantised away at CRF 18+ (§9).
 - Easing formulas you may use or replace with whatever suits the feel: `easeOutCubic(u) = 1-(1-u)**3`; `easeInOutCubic(u) = u<0.5 ? 4*u**3 : 1-((-2*u+2)**3)/2`; overshoot/back-out: `1 + 2.7*(u-1)**3 + 1.7*(u-1)**2`.
 
   **No duration or overshoot figure is mandatory.** Entry duration, overshoot size, and rhythm are taste decisions — pick what matches the narration pace and reference mood. Only these invariants are required, because breaking them breaks the result rather than merely changing the feel:
   - a scale pop **decays back to 100%** before the next pop (otherwise words collide);
   - avoid constant speed unless deliberate;
   - idle elements move in **position**, not just radius/scale (see the encoder note above).
-- Draw icons and diagrams from code shapes (donut, bar, briefcase, bulb) — never text or emoji. Backgrounds may alternate between scenes (light/dark) with one consistent accent colour.
+- Draw icons and diagrams from code shapes (donut, bar, briefcase, bulb) — never emoji or symbol codepoints, which render as tofu in display faces. Typographic characters the chosen face actually contains (arrows, bullets) are fine. Backgrounds may alternate between scenes (light/dark) with one consistent accent colour as the default.
 - Simulate motion blur by averaging several sub-frames at slightly different times.
 - Render in parallel with resume: because frames are deterministic, draw with several workers (`multiprocessing`, 4–8 processes) and skip frames whose PNG already exists and is non-empty. If a render dies, rerun the same script — only missing frames are redrawn.
 
@@ -424,7 +521,7 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
 
 Duration follows the voiceover. Compute total duration and frame count first (rules in stage 4 of `SKILL.md`):
 
-Set the cap first, from the orientation. Portrait `1080×1920` → **60 s**; landscape `1920×1080` → **300 s (5 min)**. Raise it only when the user explicitly names a target.
+Set the cap first, from the orientation — the canonical numbers are in `SKILL.md` → *Fixed specifications*: portrait `1080×1920` → **60 s**; landscape `1920×1080` → **300 s (5 min)**. Raise it only when the user explicitly names a target.
 
 ```bash
 ORIENT=landscape                # portrait | landscape -- read it from stage 2, never guess
@@ -464,8 +561,9 @@ assert not missing, f"{len(missing)} frames missing, first: {missing[:3]}"
 ffmpeg -y -i "audio/voiceover.wav" -af "loudnorm=I=-16:TP=-1.5:LRA=11" -ar 48000 work/voiceover-norm.wav
 
 # 2) prepare the music in its own file: loop to the full length, level, fade to a
-#    floor (never to absolute zero). Never add afade=t=in -- music starting from
-#    silence reads as unintended silence to the §7 gate.
+#    floor (never to absolute zero). A fade-in is allowed -- but if the bed is quiet
+#    enough that its opening half-second sits under -50 dB, the §7 gate reads that as
+#    dead air, so in that case let it enter at full level instead.
 #    -stream_loop -1 is what makes "loop the music" true: a 10 s track on a 28 s
 #    video without it leaves 18 s of dead air (measured).
 ffmpeg -y -stream_loop -1 -i "audio/music.wav" \
@@ -514,15 +612,16 @@ Target: container ≈ `DUR` seconds (to three decimals), `FRAMES` video frames, 
 Detect unintended problems:
 
 ```bash
-# black frames -- pix_th=0.02, NOT 0.05. A legitimate dark background such as
-# 0x0B0B0F (luma 0.043) is reported as "black" at the 0.05 default; measured,
+# black frames -- pix_th=0.02, NOT the 0.10 default. A legitimate dark background
+# such as 0x0B0B0F (luma 0.043) is reported as "black" at the default; measured,
 # true 0x000000 is still caught at 0.02, so 0.02 catches defects without
 # flagging dark design. Use d=0.5 so single transition frames are ignored.
 ffmpeg -i output/<slug>.mp4 -vf blackdetect=d=0.5:pix_th=0.02 -an -f null - 2>&1 | grep black_
-# frozen frames — n=0: only truly identical frames count as a freeze.
-# NEVER use n=-60dB: on flat graphics, micro-changes between frames (thousands of
-# pixels, max diff ~220) still get reported as a freeze -> false positives on video
-# that clearly moves.
+# frozen frames -- n=0: only truly identical frames count as a freeze.
+# `n` is a linear 0-1 ratio (default 0.001, about -60 dB), not a dB value --
+# never pass `n=-60dB`. On flat graphics the default already false-positives:
+# micro-changes between frames (thousands of pixels, max diff ~220) get reported
+# as a freeze on video that clearly moves.
 ffmpeg -i output/<slug>.mp4 -vf freezedetect=n=0:d=1.0 -an -f null - 2>&1 | grep freeze_
 # raw silence dump and peak level (read it; the pass/fail rule is the windowed
 # gate below -- a silent tail is legitimate when the video has no music)
@@ -530,7 +629,7 @@ ffmpeg -i output/<slug>.mp4 -af silencedetect=noise=-50dB:d=0.5 -vn -f null - 2>
 ffmpeg -i output/<slug>.mp4 -af volumedetect -vn -f null - 2>&1 | grep -E "mean_volume|max_volume"
 ```
 
-**Motion gate:** `freezedetect=n=0:d=1.0` must come back empty, except for deliberate, timeline-documented rests. A freeze means the render is genuinely still — go back to §5, add micro camera motion or element animation, re-render. Report this gate result alongside the duration.
+**Motion gate:** `freezedetect=n=0:d=1.0` should come back empty, apart from deliberate, timeline-documented rests. A freeze means the render is genuinely still — go back to §5, add micro camera motion or element animation, re-render. Report this gate result alongside the duration. The section below sets how many rests are worth an alert, not a pass/fail line.
 
 How many rests are expected scales with length, because a five-minute explainer needs breathing room a 60-second clip does not. Treat the table as an **alert threshold, not a ceiling**: a deliberate hold — comedic timing, a punchline frame, a dramatic pause after a verdict — is a legitimate editing choice when it is written in the timeline with its reason. The gate's job is to count rests and list their positions so a human judges intent; it must never fail a video for holding a frame on purpose. What stays forbidden is the *undocumented* freeze: a scene stalled because nothing was animated.
 
@@ -546,15 +645,20 @@ The lead-in is not covered by this gate: the first `VO_DELAY` (1 s) holds the ti
 **Audio gate — windowed, not whole-file.** A whole-file `silencedetect must be empty` contradicts the spec: the tail after speech is ~1.5 s of legitimate silence whenever there is no music, so the plain command can never pass. Two checks, both measured on the export:
 
 ```bash
-VO_DELAY=1              # speech starts here
+VO_DELAY=$(python3 -c "import json;print(json.load(open('audio/words.json'))['vo_delay'])")  # one source
 VO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 audio/voiceover.wav)
 HAS_MUSIC=1             # 0 when the video has no music track
-SE=$(awk -v a=$VO_DELAY -v b="$VO_DUR" 'BEGIN{printf "%.2f", a+b}')
+SE=$(awk -v a="$VO_DELAY" -v b="$VO_DUR" 'BEGIN{printf "%.2f", a+b}')
 
-# 1) no dead air inside the speech region
+# 1) no dead air inside the speech region, and no over-long lead-in.
+#    Pair start/end: a silence that begins at 0 and runs to 1.8 s prints
+#    `silence_start: 0`, which a start-only filter silently ignores.
 ffmpeg -i output/<slug>.mp4 -af silencedetect=noise=-50dB:d=0.5 -vn -f null - 2>&1 \
-  | grep silence_start \
-  | awk -v se="$SE" '$NF>0.1 && $NF<se-0.2 {print "FAIL dead air at " $NF "s"; bad=1} END{exit bad}'
+  | grep -E "silence_(start|end)" \
+  | awk -v s="$VO_DELAY" -v se="$SE" '
+      /silence_start/ { st=$NF; next }
+      /silence_end/   { en=$NF; if (en > s+0.25 && st < se-0.2) { print "FAIL dead air " st "-" en "s"; bad=1 } }
+      END { if (bad) exit 1; print "audio gate 1 OK (speech " s "-" se "s)" }'
 
 # 2) with music, the tail must still carry sound (music died early = defect)
 if [ "$HAS_MUSIC" = 1 ]; then
@@ -580,9 +684,20 @@ ffmpeg -hide_banner -nostats -i output/<slug>.mp4 -af ebur128=peak=true -f null 
 
 Target: **I between −17 and −14 LUFS** (a −16 LUFS voiceover with ducked music lands near −16, measured −16.0 on a 28 s build) and **true peak ≤ −1 dBTP**. A build with the voiceover turned down to 15% measured **−32.5 LUFS** — that is the failure this gate exists for. Report both numbers in the delivery message; `max_volume` alone does not describe loudness.
 
-**Write the sync, geometry, and repetition checks yourself when needed.** The rules are complete in prose below and in `GUIDE.md` §2: safe area 4%, two-tier glyph height, contrast per role, collision cover, repetition patterns. Translate them into code against your renderer's data structures.
+**Write the sync, geometry, and repetition checks yourself when needed.** The rules are complete in prose below and in `GUIDE.md` §2: safe area 4%, two-tier cap height, contrast per role, collision cover, repetition patterns. Translate them into code against your renderer's data structures.
 
-Suggested shape: collect every text bbox during render, then inspect at the end. What matters is that the output is **advice, not PASS/FAIL** — the decision stays yours.
+Suggested shape: collect every text bbox during render, then inspect at the end. Two checks are hard requirements — frame contiguity before encoding (§6) and the loudness/tail floor above. Everything in this section is **advice, not PASS/FAIL**: collect findings, print them, and decide. A gate that stops the script on the first finding hides the other four.
+
+```python
+findings = []
+def check(ok, msg):
+    if not ok:
+        findings.append(msg)
+    return ok
+
+# ... run the checks ...
+print("\n".join(findings) if findings else "no findings")
+```
 
 How to capture drawn text, by pipeline:
 
@@ -595,7 +710,9 @@ How to capture drawn text, by pipeline:
 
 If a pipeline cannot record which text was drawn, the sync gate cannot run — in that case verify timing from the **time table** the renderer uses (find values satisfying `text_time >= word_time`) and tell the user the check was table-based, not pixel-based.
 
-**Sync gate.** For each key text prove two things: it exists at `word_time + 0.10` and does not exist at `word_time − 0.15` (the window is tunable; what matters is its asymmetry — 0.1 s late beats appearing early). Capture all drawn text by wrapping the text call, then match by text name:
+**Sync gate.** For each key text prove two things: it exists at `word_time + 0.10` and does not exist at `word_time − 0.15` (the window is tunable; what matters is its asymmetry — 0.1 s late beats appearing early). Capture all drawn text by wrapping the text call, then match by text name.
+
+ASR times are **voiceover time**; the renderer draws on **video time**. Add `vo_delay` once, in the gate — never per scene.
 
 ```python
 seen = []
@@ -609,10 +726,14 @@ Cam.text = patched
 def at(t):
     seen.clear(); render_frame(int(round(t * 30))); return list(dict.fromkeys(seen))
 
-for word_time, text in checks:
-    assert text in at(word_time + 0.10), f"late or missing: {text} @ {word_time}"
-    assert text not in at(word_time - 0.15), f"appears too early: {text} @ {word_time}"
+VO_DELAY = json.load(open("audio/words.json"))["vo_delay"]   # read it, never re-type it
+for text, t_vo in checks:          # rendered string + ASR word time, in voiceover seconds
+    t = VO_DELAY + t_vo            # convert to video time before sampling
+    check(text in at(t + 0.10), f"late or missing: {text} @ {t:.2f}s")
+    check(text not in at(t - 0.15), f"appears too early: {text} @ {t:.2f}s")
 ```
+
+Match by **time**, not by spelling: `t_vo` comes from the ASR token index while `text` comes from the script, because the ASR spelling is deliberately kept as-is (§3). A gate that string-matches ASR text to drawn text can never pass.
 
 On failure, fix the time table — never nudge numbers inside a scene (§5).
 
@@ -620,20 +741,25 @@ On failure, fix the time table — never nudge numbers inside a scene (§5).
 
 ```python
 # 1) safe area: no glyph crosses 4% of the frame edge (same value as GUIDE.md §2).
-#    Use textbbox with the SAME anchor you draw with. Without anchor="mm" the box is
-#    relative to the top-left origin (measured: drawing "92" at (200,100) returns
-#    (200,111,284,157) at the default anchor), so the comparison is meaningless.
+#    textbbox is in canvas coordinates with the default anchor AND with anchor="mm"
+#    (measured: drawing "92" at (200,100) returns (200,116,311,176)); pass the SAME
+#    anchor you draw with, and the comparison holds either way.
 bb = d.textbbox((px, py), s, font=f, anchor="mm")
-assert bb[0] > W * 0.04 and bb[2] < W * 0.96, f"crosses side safe area: {s}"
-assert bb[1] > H * 0.04 and bb[3] < H * 0.96, f"crosses top/bottom safe area: {s}"
+check(bb[0] > W * 0.04 and bb[2] < W * 0.96, f"crosses side safe area: {s}")
+check(bb[1] > H * 0.04 and bb[3] < H * 0.96, f"crosses top/bottom safe area: {s}")
 
-# 1b) legibility: GLYPH height from the measured box, not the size argument.
+# 1b) legibility: CAP height, not the full box.
+#     bb[3]-bb[1] over-measures mixed case (descenders) and badly under-measures a
+#     lowercase-only line: at size 60 on DejaVu Sans Bold, "KATA" measures 44px but
+#     "sun" measures 35px, against a 43px threshold on a 1080 short side.
+#     Cap height is measured once per face and does not depend on the string.
 #     Two tiers per GUIDE.md §2, against the SHORT side so portrait and landscape
 #     share one number: short side 1920 -> primary 77px, supporting 48px;
 #     short side 1080 -> primary 43px, supporting 27px.
 S = min(W, H)
-gh = bb[3] - bb[1]
-assert gh >= S * (0.04 if is_main else 0.025), f"text too small: {s} ({gh}px)"
+cap = f.getbbox("H")                  # non-Latin script: use its tallest reference glyph
+cap_h = cap[3] - cap[1]
+check(cap_h >= S * (0.04 if is_main else 0.025), f"text too small: {s} (cap {cap_h}px)")
 
 # 2) text collision: coverage, not IoU.
 #    IoU < 0.16 is too loose: two 100px-tall lines overlapping by 20px score 0.111
@@ -651,14 +777,16 @@ def cover(a, b):
 # Only glyph boxes are compared against each other, never against the panel or card
 # behind them, so a label sitting on a card is not a collision.
 if bb_a != bb_b:
-    assert cover(bb_a, bb_b) < 0.02, f"text overlaps: {s}"
+    check(cover(bb_a, bb_b) < 0.02, f"text overlaps: {s}")
 
 # 3) contrast: WCAG ratio, threshold tied to the text ROLE (GUIDE.md §2),
 #    not to pixel size -- small moving text reads worse than static text
-assert ratio(fill, bg_color) >= (3.0 if is_main else 4.5), f"contrast too low: {s}"
+check(ratio(fill, bg_color) >= (3.0 if is_main else 4.5), f"contrast too low: {s}")
 ```
 
 A label sitting inside a title block legitimately scores cover 1.0 — that is why the identical-box exclusion exists and why this is advice to read, not a hard fail. What it must catch: two independent lines that share any real band of pixels.
+
+For a **portrait** export, run the platform band as a second check on primary text: 10% from the bottom and 12% from the right (`GUIDE.md` §2), and 15% from the bottom for anything that must be read. The 4% gate above still covers every element.
 
 **Contrast gate** uses the same WCAG formula as `GUIDE.md` §2, with the threshold tied to the text's role: **3.0:1** for primary text, **4.5:1** for supporting text. Measured pairs, reproducible with the formula above:
 
@@ -669,7 +797,7 @@ A label sitting inside a title block legitimately scores cover 1.0 — that is w
 | `(238, 150, 130)` light salmon | `(245, 241, 234)` cream | **2.00:1** | hard fail |
 | `(20, 20, 20)` ink | `(250, 244, 232)` cream | **16.8:1** | passes everything |
 
-Any accent below ~3:1 on cream fails for text of any role; the fix is to darken the accent until the measured ratio clears, not to lower the threshold. When this gate rejects, change the colour, move the text onto a dark background, or place a solid panel behind it.
+An accent below 3:1 fails for primary text, and below 4.5:1 it fails for supporting text; the fix is to move the accent until the measured ratio clears, not to lower the threshold. When this gate rejects, change the colour, move the text onto a dark background, or place a solid panel behind it. On a dark palette the accent usually needs **lightening** — `fit_accent` in `GUIDE.md` §2 searches both directions for that reason.
 
 ### Third gate: repetition pattern (flags, never rejects)
 
@@ -706,7 +834,7 @@ for i in range(1, len(sigs)):
         print(f"scenes {i} and {i+1} share a pattern: {sigs[i]}")
 ```
 
-Vary composition on purpose, and record it: keep a small per-scene vector (composition zone, density, scale, background) and refuse to leave **three consecutive scenes** on the same vector. Two in a row can be a deliberate pair; three is the "same layout, different words" failure `GUIDE.md` §6 warns about.
+Vary composition on purpose, and record it: keep a small per-scene vector (composition zone, density, scale, background). **Three consecutive scenes** on the same vector is a flag, not a verdict — keep it only with a written reason. Two in a row can be a deliberate pair; three is the "same layout, different words" failure `GUIDE.md` §6 warns about.
 
 If two consecutive scenes share a pattern, **do not change them automatically**. Write one sentence in the timeline:
 
@@ -718,7 +846,7 @@ Deliberate repetition is often good and always legitimate. What must surface is 
 The same text drawn twice at the same position (e.g. text over a highlight block) is IoU 1.0 — deliberate; exclude identical pairs. Run every gate before export, not after; re-rendering one scene is cheaper than re-rendering a video.
 
 Two things that make these gates mislead:
-- `freezedetect` with `n=-60dB` (the default) FALSE POSITIVES on motion graphics: decoded frames inside the "frozen" range can change thousands of pixels per frame (idle elements, breathing dots) yet the filter still reports a freeze because the threshold is too high for flat graphics. Always use `n=0`.
+- `freezedetect` with its default `n=0.001` (about −60 dB) FALSE POSITIVES on motion graphics: decoded frames inside the "frozen" range can change thousands of pixels per frame (idle elements, breathing dots) yet the filter still reports a freeze because the tolerance is too high for flat graphics. Always use `n=0`. Note that `n` is a linear 0–1 ratio, not a dB value — `n=-60dB` is not a legal argument.
 - Source frames move but the MP4 reports a freeze at the same point? That is the encoder: small elements (radius <15 px, motion <10 px/frame) in a large flat area can be quantised away at CRF 18+. Enlarge the idle element or drop CRF to 16 — do not add new motion.
 
 `max_volume` touching 0 dB means clipping risk — and if `alimiter` is installed yet max is still 0 dB, the cause is almost certainly its default `level` option (§9).
@@ -733,7 +861,7 @@ ffmpeg -ss $(awk -v d="$DUR" 'BEGIN{print d-0.1}') -i output/<slug>.mp4 -frames:
 
 The contact sheet needs `-frames:v 1`: a `tile` grid is one image, and without it ffmpeg tries to write that image once per input frame and dies at the second one (`Cannot write more than one file with the same name`, exit −22).
 
-The grid must also cover the whole video, and the cap is now 300 s for landscape — 5× the old 60 s. `fps=1` at `8x8` stops at 64 s, so a 5-minute video silently loses its last four minutes. Size both the interval and the grid from `DUR`:
+The grid must also cover the whole video, and a landscape video can run 300 s. `fps=1` at `8x8` stops at 64 s, so a 5-minute video silently loses its last four minutes. Size both the interval and the grid from `DUR`:
 
 ```bash
 CELLS=$(( (DUR + 2) / 3 ))                       # one thumbnail per 3 s
@@ -742,7 +870,7 @@ ffmpeg -i output/<slug>.mp4 -vf "fps=1/3,scale=240:-1,tile=${GRID}x${GRID}" \
   -frames:v 1 work/check/sheet.png
 ```
 
-Measured: 60 s → 20 cells in 5×5; 300 s → 100 cells in 10×10. Never hand-tile a fixed grid for a duration that can now reach five minutes.
+Measured: 60 s → 20 cells in 5×5; 300 s → 100 cells in 10×10. Never hand-tile a fixed grid for a duration that can reach five minutes.
 
 ## 8. Self-made background music
 
@@ -771,12 +899,13 @@ Use at most a few per video, always below the voiceover level, and tell the user
 
   Conclusion: `volume=2` with the default `normalize` equals `normalize=0`, so the §6 example is safe on both 6.x and 7.x. The danger is combining them. Pick one, then measure with `volumedetect` — never trust the formula, because `amix` defaults change between versions. If `max_volume` hits 0.0 dB despite `alimiter`, check whether `volume` and `normalize=0` are both applied, then check alimiter's `level` option.
 - **`loudnorm` inline + `apad` = dead audio tail:** never combine them in one `filter_complex`. Normalise the voiceover into a separate file first (three-step recipe in §6, gate in §7). Measured: one chain → `silence_start 40.86` in a 43 s video, tail −91 dB; three steps → tail −25 to −33 dB, no dead air inside the speech region.
-- **`afade=t=in` on music trips the audio tail gate:** music starting from silence reads as unintended silence (measured: `silence_start 0`, 0.53 s). Let music enter at full level; fade only at the end.
+- **A quiet music bed plus `afade=t=in` can trip the audio gate:** silence is only reported when the opening actually sits under −50 dB for 0.5 s. Measured: a 0.53 s fade-in on a normally-levelled bed produced no `silence_start` at all and passed. Check the level, not the fade — if the bed is quiet enough to fall under −50 dB at the start, let it enter at full level instead.
 - **`afade=t=out` ending exactly at the last frame is silence, not a fade-out:** measured, `st=DUR-2.5:d=2.5` on a 28 s video left the final **0.8 s at −61.7 dB** — indistinguishable from the music having stopped. Fade to a floor with a `volume` expression (§6), or stop the fade earlier.
 - **Music shorter than the video:** without `-stream_loop -1` the track simply ends and the rest is dead air (measured: 10 s track on a 28 s video → `silence_start 26.0`). The pipeline promises the music is looped; loop it in step 2.
 - **Mono output from a mono voiceover:** `-ac 2` on export. Measured `channels=1` without it; platforms accept mono but stereo costs nothing.
 - **`silencedetect` `$3` is not the timestamp.** The logger writes `[silencedetect @ 0x…] silence_start: 12.34`, so the time is the **last** field (`$NF`). Filtering on `$3` silently matches nothing and every gate appears to pass.
-- **`textbbox` with `anchor` is not the glyph shape:** treating bb[1]/bb[3] as symmetric around the anchor point is wrong for numerals and capital text. Always compute the bbox centre offset from the anchor before placing inside a shape (see `GUIDE.md` §2). And always pass the **same anchor** you draw with — at the default anchor the returned box is relative to the draw origin, not the canvas, so `assert bb[0] > W*0.04` compares an x-offset to a canvas margin.
+- **`textbbox` with `anchor` is not the glyph shape:** treating bb[1]/bb[3] as symmetric around the anchor point is wrong for numerals and capital text. Always compute the bbox centre offset from the anchor before placing inside a shape (see `GUIDE.md` §2). Pass the **same anchor** you draw with: the box is in canvas coordinates either way (measured: drawing "92" at (200,100) returns (200,116,311,176) at the default anchor), so the safe-area comparison is valid — but bb[1] is offset from the draw point, which matters for centring.
+- **Glyph height taken from `textbbox` is not cap height:** mixed case adds descenders, and a lowercase-only line returns x-height. Measured on DejaVu Sans Bold at size 60: `"KATA"` = 44 px, `"sun"` = 35 px, against a 43 px threshold on a 1080 short side. Using `bb[3]-bb[1]` fails correct type (and passes small type). Measure `font.getbbox("H")` once per face, or the tallest reference glyph for non-Latin scripts.
 - **`blackdetect` default `pix_th=0.1` flags legitimate dark design:** a `0x0B0B0F` background (luma 0.043) is reported as black from `pix_th=0.05` upward; at `0.02` it is clean while true `0x000000` is still caught. Use `pix_th=0.02`.
 - **`tile` without `-frames:v 1`** writes the grid once per input frame and fails on the second (`Cannot write more than one file with the same name`, exit −22). Also make sure the tile grid has room: a fixed `8x8` at `fps=1` covers only 64 s, so a 300 s landscape video shows its first minute and silently drops the other four. Size interval and grid from `DUR` (§7).
 - **Missing frames mid-sequence truncate the encode:** `-i work/frames/%05d.png` stops at the first gap, and `-pattern_type glob` reorders but does not fill. Measured: a 5-file sequence with `00002.png` missing encoded 2 frames. Assert contiguity before encoding (§6).
@@ -784,7 +913,7 @@ Use at most a few per video, always below the voiceover level, and tell the user
 - **`textbbox` with `anchor="mm"` at the origin returns HALF widths:** `bbox[2]` is the right edge measured from a centred origin, so using it as a word's width makes every following word overlap the previous one (measured: adjacent words scored 0.43–1.00 coverage and read as double-printed). Always take `b[2] - b[0]` for advances, totals, and tracking — per character as well.
 - **Missing glyphs render as tofu, not as nothing:** the ⚡ character does not exist in Archivo Black and rendered as a placeholder box mid-video (measured on an otherwise passing gate run — the pixel gates do not catch it). Draw symbols (lightning, arrows, badges) as polygons/paths in code; never put emoji or symbol codepoints through a display font.
 - **Decorations must never cross a text band:** a charging cable drawn straight through a centred label, and a connector plug landing on a chip, both measured. When a diagram needs a line where text sits, move the label (e.g. split it into two left-anchored lines beside the line's axis), never layer text over the stroke.
-- **Chips and badges: build the box from the measured content, not the reverse:** box = padding + icon + gap + text width, the whole group centred on its anchor. Hand-placing the box and the text separately measured off-centre by tens of pixels. Also: a keyword inside a chip is a *badge*, not primary text — set it in the supporting tier (≥2.5% glyph height), not the primary tier, or it dwarfs the card around it.
+- **Chips and badges: build the box from the measured content, not the reverse:** box = padding + icon + gap + text width, the whole group centred on its anchor. Hand-placing the box and the text separately measured off-centre by tens of pixels. Also: a keyword inside a chip is a *badge*, not primary text — set it in the supporting tier (≥2.5% cap height), not the primary tier, or it dwarfs the card around it.
 - **ASR homographs break keyword lookup:** matching the word `jadi` by first occurrence grabbed an earlier sentence's token (and an empty ASR artifact split one word into two), silently collapsing a scene range and leaving an 11-second stretch drawing only the closing scene — which no pixel gate flagged as wrong. Index repeated words from the END (`occ=-1`) for closings/verdicts, and after building the timeline, assert scene ranges are increasing (`a < b` for every consecutive pair).
 - **Word-level width math is the collision gate's blind spot's twin:** the geometry gate only fires on the frames you sample. Run the coverage check on frames at *every* sentence midpoint, not just the sync-check moments, or an overlap that appears only while words are mid-pop stays invisible.
 - **Small idle elements quantised by the encoder:** dots/particles under ~15 px radius that merely pulse in a large flat area can vanish after encoding (CRF 18+), leaving identical decoded frames → a real freeze in the MP4 even though the renderer drew motion. Enlarge the element and move its position, not just its radius (a solid antialias-free circle changing radius often alters no pixel at all).
@@ -807,7 +936,7 @@ Use at most a few per video, always below the voiceover level, and tell the user
 | `output/<slug>.srt` | subtitle track, when generated |
 | `output/publish.txt` | caption, description, hashtags for upload |
 
-Before deleting, confirm the gates passed — duration, frame count, loudness, black/freeze/tail — measured from the exported MP4, never from the timeline.
+Before deleting, confirm the required checks passed — duration, frame count, loudness, tail floor, black/freeze — measured from the exported MP4, never from the timeline. Advisory findings (sync, geometry, repetition) are recorded with the decision you took on each.
 
 **Verify the kept set is self-sufficient, not just present.** One command proves a revision is possible after cleanup:
 

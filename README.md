@@ -31,7 +31,7 @@ The output is an **MP4 (H.264 + AAC, 30 fps, constant frame rate)** whose length
 | Portrait `1080×1920` | **60 s** | Reels / TikTok / Shorts |
 | Landscape `1920×1080` | **300 s** (5 min) | YouTube explainer |
 
-Longer only when you ask. Resolution follows the reference video's orientation; without a reference it asks, and falls back to **1920×1080** landscape or **1080×1920** portrait.
+Longer only when you ask. Orientation is chosen in stage 1, before the script is written, because it sets the cap; a supplied reference must match that orientation and never changes it. Without a preference it asks, and falls back to **1920×1080** landscape or **1080×1920** portrait.
 
 ---
 
@@ -60,7 +60,7 @@ This skill is **rules, not a template.**
 
 | Layer | Divided how |
 |---|---|
-| 🎯 **Accuracy** | Measurable, must pass — timing follows the spoken word, text stays in the safe area, glyph height meets threshold, contrast meets WCAG, no dead air inside the narration, mix loudness in band, frame count is exact |
+| 🎯 **Accuracy** | Measurable and reported with numbers — timing follows the spoken word, text stays in the safe area, cap height meets threshold, contrast meets WCAG, no dead air inside the narration, mix loudness in band, frame count is exact. Two are hard requirements: frame contiguity before encoding, and the finished loudness/tail floor |
 | 🎨 **Taste** | Entirely yours — palette, scene count, transitions, typeface, mood, motion rhythm |
 
 The test applied to every rule before it entered these documents:
@@ -89,8 +89,8 @@ Word-count estimation is the documented fallback, clearly labelled as approximat
 <details open>
 <summary><b>📐 Typography geometry</b></summary>
 
-- Safe area: **4%** from every edge — and for portrait short-form, **10% bottom / 12% right**, because the platform UI covers that band
-- Glyph height, not font size: **4%** of the short side for primary text, **2.5%** for supporting text (1080p landscape → 43 px / 27 px)
+- Safe area: **4%** from every edge — and for portrait short-form, **10% from the bottom / 12% from the right** as the floor, with anything that must be read kept at **15% from the bottom** because the platform UI sits over that band
+- **Cap height**, not font size: **4%** of the short side for primary text, **2.5%** for supporting text (1080p landscape → 43 px / 27 px). Measured once per face (`font.getbbox("H")`), never from a string's bbox
 - Centring is measured from the glyph box, never delegated blindly to `anchor="mm"`
 - Text collision checked by **coverage of the smaller box (< 0.02)**, not IoU — IoU 0.16 lets a 20% line overlap pass
 
@@ -104,7 +104,7 @@ Thresholds are tied to the text's **role**, not its pixel size — small moving 
 - Primary text: **3.0:1**
 - Supporting text: **4.5:1**
 
-Measured with the WCAG formula: a light salmon `(238,150,130)` on cream `(245,241,234)` reaches only **2.00:1** — a hard fail; darkening the accent to `(166,82,70)` reaches **4.76:1** and passes for supporting text. The docs ship a `fit_accent()` helper that walks lightness until the ratio clears, so the palette is chosen by measurement rather than by eye.
+Measured with the WCAG formula: a light salmon `(238,150,130)` on cream `(245,241,234)` reaches only **2.00:1** — a hard fail; darkening the accent to `(166,82,70)` reaches **4.76:1** and passes for supporting text. The docs ship a `fit_accent()` helper that walks lightness in **both directions** and raises when the target is unreachable, so the palette is chosen by measurement rather than by eye.
 
 </details>
 
@@ -123,7 +123,7 @@ Measured traps that produced these rules: `loudnorm` inline with `apad` drops th
 <details open>
 <summary><b>🎞 Motion</b></summary>
 
-Every second of video keeps at least one element moving. Verified with `freezedetect=n=0` — never the default `n=-60dB`, which false-positives on flat graphics. The 1 s lead-in before speech is exempt.
+Every second of video keeps at least one element moving. Verified with `freezedetect=n=0` — never the default `n=0.001` (about −60 dB), which false-positives on flat graphics. The 1 s lead-in before speech is exempt.
 
 Frame contiguity is asserted before encoding: a missing PNG mid-sequence silently truncates the MP4 (`%05d` input stops at the gap).
 

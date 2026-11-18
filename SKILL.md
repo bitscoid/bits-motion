@@ -9,9 +9,9 @@ Turn one topic into a finished motion-graphics video (MP4) — not a storyboard,
 
 **Language split.** Documents in this skill are English. Everything the user reads — chat messages, script drafts, delivery summary — is Indonesian. File contents (script, comments) follow the naming rules in *Project layout*.
 
-## Never run this in a subagent
+## Never split this workflow across agents
 
-Execute every stage in the main session: script, assets, sync, render, QC. Do not delegate any part of the workflow to a subagent, task tool, or another agent.
+Execute every stage in one session: script, assets, sync, render, QC. Do not hand a stage to a subagent, task tool, or another agent — the timing table, the render function, and the QC numbers have to stay in the same context. On an orchestrated host, this workflow is the orchestrator's own work, not a delegated task.
 
 **One exception: looking at an image.** Reading a picture is not a stage. Delegate only the call that turns an image into text, and only when the main model cannot see it — see *Vision routing* below.
 
@@ -26,10 +26,12 @@ Asset analysis (stage 4), reference-frame reading (stage 4), and QC contact shee
    - the image arrives replaced by a placeholder such as `[image omitted: ...]`.
 
    Empty `content` **is** the signal. A provider that advertises `vision: true` can still strip the image and answer nothing — measured on this gateway, 15 of 72 flagged models did exactly that.
-3. **Then delegate, once.** Hand the single image call to the `vision` subagent and use its text answer:
+3. **Then delegate, once.** Hand the single image call to the `vision` subagent and use its text answer. Call it through whatever your host provides — opencode: `subagent` with `agent: "vision"`; Claude Code: `task(subagent_type: "vision")`. Prompt:
+
    ```
-   task(subagent_type: "vision", prompt: "Read <path>. Report: exact text, layout, colours, and what it depicts. One paragraph.")
+   Read <path>. Report: exact text, layout, colours, and what it depicts. One paragraph.
    ```
+
    The `vision` subagent already runs a failover chain over models proven to read images, so do not pick a model yourself, do not retry the main model, and do not build a second chain inside this skill.
 4. **Never loop.** One direct attempt, one delegated attempt. If both fail, tell the user the image could not be read and ask for a text description — do not keep swapping models.
 5. **What still stays in the main session:** writing the script, timing, scene code, rendering, and every QC number. The subagent returns a *description*; the decisions built on it are still yours. Never hand the whole stage to a subagent.
@@ -43,21 +45,17 @@ Batch when there are several images in one stage — a single `vision` call nami
 | Parameter | Value |
 |---|---|
 | Final duration | Voiceover duration + ~1 s lead-in + ~1.5 s tail, rounded **up** to whole seconds. No minimum |
-| Duration cap (`MAX_DUR`) | **Portrait 60 s**, **landscape 300 s (5 min)**, locked. Raise only when the user explicitly asks |
+| Orientation + cap (`MAX_DUR`) | **Portrait `1080×1920` → 60 s** (Reels / TikTok / Shorts) · **Landscape `1920×1080` → 300 s** (YouTube explainer). No reference and no answer in stage 1 → landscape. Locked unless the user explicitly asks for longer |
 | Frame rate | 30 fps, constant |
 | Frame count | duration × 30, exact. Example: 43 s = 1290 frames |
 | Format | MP4, H.264 video (high profile), AAC audio, stereo |
 | Loudness | finished mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP |
-| Resolution | Follow the reference video's orientation. Without a reference, ask in stage 1; if unanswered use 1920×1080 (cap 300 s). Portrait = 1080×1920 (cap 60 s) |
 
-Audio decides length. The cap depends on orientation, because the two targets are different products: a portrait Reels/TikTok clip is a 60-second short, a landscape YouTube explainer can hold five minutes. `MAX_DUR` stays locked unless the user asks for more — if the voiceover overruns the cap for that orientation, stop and ask; never silently lengthen the video.
+Audio decides length. The cap depends on orientation, because the two targets are different products: a portrait Reels/TikTok clip is a 60-second short, a landscape YouTube explainer can hold five minutes. If the voiceover overruns the cap for that orientation, stop and ask; never silently lengthen the video.
 
-| Orientation | `MAX_DUR` | Why |
-|---|---|---|
-| Portrait `1080×1920` | **60 s** | Reels / TikTok / Shorts sweet spot |
-| Landscape `1920×1080` | **300 s** (5 min) | YouTube explainer length |
+Orientation is settled when the script is written (stage 1), not when a reference appears (stage 2), because the cap sets the script length. An explicit user target replaces the table's number for that run, and it may be longer than 300 s only if the user named it.
 
-The orientation picks the row — and orientation is settled when the script is written (stage 1), not when a reference appears (stage 2), because the cap sets the script length. An explicit user target replaces the row's number for that run, and it may be longer than 300 s only if the user named it.
+**Precedence:** the user's explicit choice wins; otherwise the stage-1 decision stands. A reference never changes the cap — if its aspect does not match the chosen orientation, it fails the reference filter (`RENDER.md` §4) and the next candidate is tried.
 
 Once stage 4 computes the total duration, that number is the exact render target. The file must be exactly that long: voiceover and visuals are already synced to that timeline, so a small drift truncates the ending or leaves it hanging.
 
@@ -71,7 +69,7 @@ A new rule belongs here only if it satisfies **both**:
 
 A rule that passes (1) but fails (2) is a restriction, not a standard. Rejected examples: "overshoot must be 1.16", "the hook must be 3 seconds", "scenes must be 2–6 seconds", "the palette must be cream".
 
-- **Required (measurable):** text timing follows the spoken words; text inside a shape is centred by glyph box; no text collides or leaves the safe area; glyph height meets the threshold; contrast meets the threshold; no dead audio inside the speech region; mix loudness inside the stated band; frame count is exact.
+- **Measured and reported:** text timing follows the spoken words; text inside a shape is centred by glyph box; no text collides or leaves the safe area; cap height meets the threshold; contrast meets the threshold; no dead audio inside the speech region; mix loudness inside the stated band; frame count is exact. Two of these are hard requirements (frame contiguity before encoding, finished loudness and tail floor); the rest inform your decision.
 - **Free (your call):** palette, scene count, transition order, **font choice and typeface family**, mood, text placement, cut rhythm, animation duration, overshoot amount, whether an idea needs words at all.
 
 Every number left in these documents **protects** something (legibility, safe area, contrast, encoder behaviour). If you find a number that dictates taste, treat it as a bug in this document: skip it and say so.
@@ -127,7 +125,7 @@ tiga-mitos-otak/
 
 **`audio/words.json` is outside `work/` on purpose.** It is the only derived file a revision cannot cheaply recreate: re-running ASR after a cleanup returns timestamps that differ by ~±0.1 s from the ones the pictures were synced to, so a re-render would drift. Keeping it in `audio/` makes `rm -rf work` lose nothing that matters, and `render.<ext>` reads it from there. Everything else in `work/` is either an input (`audio/`, `assets/`) or rebuildable in one command.
 
-`render.py` is the Python pipeline's name. The build script is always one entry point, `render.<ext>` — `render.mjs` for Remotion, `render.ts` for a Node/Playwright project. Never two.
+`render.py` is the Python pipeline's name. The build script is always one entry point, `render.<ext>` — `render.mjs` for Remotion, `render.ts` for a Node/Playwright project. Never two entry points. Helper modules are fine (`lib/`, `make_music.py`) as long as `render.<ext>` is the only thing you run end to end.
 
 Never create empty directories. No images means no `assets/`. No music means no `audio/music.wav`.
 
@@ -147,8 +145,8 @@ One separator only: **the hyphen**. Spaces force shell quoting; underscores are 
 1. **No version suffixes.** No `_final`, `_v2`, `_fix`, `_new`, no dates. A re-render overwrites the same name.
 2. **Write the title as a title** in user-facing text (`Tiga Mitos Otak`), never as the slug. The slug is only for paths.
 3. **Keep slugs near 40 characters**, cut on whole-word boundaries. Longer is painful in a file manager.
-4. **Strip these characters from titles**: `? ! : ; / \ * " < > |` and trailing dots; spaces become hyphens.
-5. **Folder already exists → ask.** Never overwrite, never append `-2`. Videos get re-rendered many times; stacked copies leave the user unsure which is current.
+4. **Reduce the slug to `[a-z0-9-]`**: transliterate what you can, then strip every remaining character that is not a lowercase letter, digit, or hyphen — punctuation, quotes, ampersands, dollar signs, backticks, parentheses, commas, and dots. Turn spaces into hyphens. A slug has to survive an unquoted shell command: `&` and `$` break far more than a space does.
+5. **Folder already exists → ask, unless it is this project's own folder.** A revision of the same topic continues in place and overwrites the same name; a different project with a colliding slug stops and asks. Never append `-2`; stacked copies leave the user unsure which is current.
 
 ### Incoming assets
 
@@ -169,6 +167,8 @@ If two candidates could both be the voiceover, or a file's role stays unclear af
 
 `project.json`, `timing.json`, `scenes.py`, `manifest.json`, `style.json`, `review/`, or a separate QC report. Creative decisions (font, voice, palette) are agreed with the user and live in `render.<ext>`; check results are reported directly in the delivery message. Three exceptions, because they are data and not reports: `audio/words.json` (word timings), the optional `output/<slug>.srt`, and `output/publish.txt` (platform upload copy).
 
+Tool configuration a pipeline genuinely needs — `package.json`, `tsconfig.json`, `.npmrc`, `node_modules/` — is not a project document: create it when the chosen pipeline requires it. The ban is on parallel sources of truth, not on the toolchain.
+
 ### Starting behaviour
 
 - Work in a **subfolder named after the slug**, never in the working directory itself. Everything lives inside it, so two topics never collide.
@@ -184,9 +184,9 @@ Follow this order. Do not jump to render before stages 1–3 are done.
 The user gives a topic. Your first job is the narration script — unless the user brings their own script or recording, in which case use theirs and skip to stage 2.
 
 Script guidance:
-- **Know the orientation before writing.** The cap follows it (portrait 60 s, landscape 300 s), and the cap sets the script length — so orientation is decided first, not in stage 2. If the user gave a reference video, its orientation answers it. Otherwise ask it as part of the first message, together with the script. Never write 740 words for a portrait Reels clip.
+- **Know the orientation before writing.** The cap follows it (portrait 60 s, landscape 300 s), and the cap sets the script length — so orientation is decided first, not in stage 2. If the user already named a target, that settles it; otherwise ask it as part of the first message, together with the script. A reference video is checked against the decision, never used to change it. Never write 740 words for a portrait Reels clip.
 - Length follows the topic, computed from the active cap: **~2.5 words per second** including ~2.5 s of lead-in and tail. Portrait 60 s → **~140 words**; landscape 300 s → **~740 words**. These are derived figures, not rules, and they are ceilings: a topic that lands in 90 s on a 5-minute target stays 90 s. Never pad sentences to fill time. Show the estimated voice and video duration.
-- Structure: open with whatever grips hardest (a sentence, a question, a number), then 2–3 core points, then a closing line that lands. The hook is about effect, not seconds — the first 3 s is a rough guide, not a requirement. Keep sentences short so they split cleanly into on-screen text and read well through TTS.
+- Structure: open with whatever grips hardest (a sentence, a question, a number), then the core points the length allows, then a closing line that lands. The hook is about effect, not seconds — the first 3 s is a rough guide, not a requirement. Keep sentences short so they split cleanly into on-screen text and read well through TTS.
 - On a five-minute landscape target, 2–3 core points is not enough air; give each core point its own beat and keep one idea per scene. On a 60-second portrait target, cut to the single sharpest point and let it breathe.
 - Clear, natural spoken language. Spell numbers, abbreviations, and foreign terms so TTS cannot mispronounce them.
 - Never invent facts. If the topic needs data, search the web when available, otherwise use safe general claims.
@@ -202,9 +202,11 @@ Batas: [60 / 300 / angka yang Anda setujui] detik
 
 **[Hook]** ...
 **[Inti 1]** ...
-**[Inti 2]** ...
+**[Inti N]** ...
 **[Penutup]** ...
 ```
+
+`N` follows the target length: one sharp point for a 60-second portrait clip, three or more points (one beat each) for a five-minute landscape script. Two is not a default — the template shows a range on purpose.
 
 The label line before the script is not optional: it tells the user, before any work, which cap the script is being written against. If the orientation is still unknown when the script is ready, say so on that line (`Format: belum ditentukan — saya pakai mendatar (maksimal 5 menit)`) and let them correct it.
 
@@ -239,7 +241,7 @@ kecuali suara — suara yang menentukan panjang dan penyesuaian waktu video.
    cari gambar yang sesuai di internet, menggambarnya lewat kode, atau
    menggabungkan keduanya — mana yang paling jelas untuk tiap bagian.
 
-5. Orientasi layar (menentukan panjang maksimal)
+5. Orientasi layar (menentukan panjang maksimal) — kalau belum Anda tentukan:
    Tegak (1080×1920, untuk Reels/TikTok/Shorts, maksimal 60 detik)
    atau mendatar (1920×1080, untuk YouTube, maksimal 5 menit)?
    Kalau tidak disebut, saya pakai mendatar.
@@ -260,13 +262,14 @@ tipografinya.
 | Background music | `audio/music.wav` | Optional | You generate simple music, or render silent |
 | Style reference video | `assets/reference.mp4` | Optional | Search Pinterest for `motion graphics` + topic keywords (stage 3); if nothing fits, design the style yourself |
 | Supporting images (1st, 2nd, …) | `assets/image-01.png`, `assets/image-02.png`, … | Optional | You find suitable images online, draw them in code, or both |
-| Screen orientation | — | Ask (it sets `MAX_DUR`) | Default landscape 1920×1080 → cap 300 s; portrait 1080×1920 → cap 60 s |
+| Screen orientation | — | Asked with the script in stage 1; repeat here only if still open | Default landscape 1920×1080 → cap 300 s; portrait 1080×1920 → cap 60 s |
 | Captions / subtitles | burned-in or `output/<slug>.srt` | Optional, asked once | No captions; offer the `.srt` in the delivery message |
 
 The table above is for your own reference. What reaches the user is the Indonesian block. Typography is **not** asked about — that is your call in stage 4, and if the right font is not installed you download it.
 
 ### Stage 3 — Confirm readiness
 
+- **Script approval.** If the topic was ambiguous, or the script makes a structural choice the user has not seen (angle, number of points, tone), show it and wait for one confirmation before generating voice. When the brief is clear, proceed — stage 2's ask already covered the rest.
 - **Everything needed is present:** proceed without further questions. Treat user assets as the primary material. Tell the user in one line: `Semua bahan sudah lengkap. Saya mulai kerjakan.`
 - **Something is missing and unanswered:** ask exactly once, then continue with the documented default. Stage 2's list is the only ask; stage 3 never re-opens it. An unanswered orientation means landscape; unanswered music means no music; unanswered reference means you pick one. Only a missing **voiceover** with no way to generate one blocks the pipeline — everything else has a stated default.
 - **The user supplies a Pinterest URL as the reference:** do not ask again — that URL is the reference. Download it and continue.
@@ -276,18 +279,18 @@ The table above is for your own reference. What reaches the user is the Indonesi
   ```
 
   Then probe it. If it fails (region block, removed pin, no video stream, under 5 s, or wrong aspect ratio), say so once and fall back to the search path below — never silently drop the style anchor.
-- **The user declines to supply a reference, or asks for everything automatic:** searching Pinterest yourself is **mandatory before self-design** — never jump straight to designing your own style. The search path failed in a measured run (2026-11) only after 8 candidates; that is the budget to beat. Work in this order:
+- **The user declines to supply a reference, or asks for everything automatic:** searching Pinterest yourself is **mandatory before self-design** — never jump straight to designing your own style. Budget: **at least 5 pin candidates across 2 searches** is the floor; a measured run (2026-11) needed **8 candidates** before it succeeded, so treat 8 as the working target when the first candidates fail. Work in this order:
 
   1. **Search.** Use the Pinterest search URL directly or a web search, keywords = `motion graphics` + the topic's own words:
      - `https://id.pinterest.com/search/pins/?rs=typed&q=motion+graphics+<topik>` (or `pinterest.com pin <topic keywords> motion graphics video` through a web search)
      - try Indonesian AND English keywords; collect 5+ candidate pin URLs before downloading anything.
   2. **Download one at a time** until one passes the filter: `yt-dlp "<pin-url>" -o "assets/reference.mp4"`.
-  3. **Filter with `ffprobe`** and discard: under 5 s, over 90 s, wrong aspect ratio (a reference only needs to *match the orientation*, not the output resolution — a 720×1280 pin is a perfectly good style anchor for a 1080×1920 video; see `references/RENDER.md` §4), no video stream. Discarded → next candidate.
+  3. **Filter with `ffprobe`** and discard: under 5 s, over 180 s (three minutes is enough to read a style; longer costs analysis time for no extra signal), wrong aspect ratio (a reference only needs to *match the orientation*, not the output resolution — a 720×1280 pin is a perfectly good style anchor for a 1080×1920 video; see `references/RENDER.md` §4), no video stream. Discarded → next candidate.
   4. **Measured failure modes (do not read them as "Pinterest is down"):**
      - many pins are images with a video thumbnail → yt-dlp exits `No video formats found!` → skip, next pin;
      - pins that embed Vimeo can fail with `Unable to extract info section` or an SSL `Hostname mismatch` for `vimeo.com` — some environments TLS-block Vimeo; try the direct `vimeo.com/<id>` URL once, then skip the whole domain;
      - a successful download may still be a 4 s loop → discarded by the 5 s filter.
-     Budget: **at least 5 pin candidates across at least 2 different searches** before declaring the search exhausted. Report to the user how many were tried and why each failed — one line each is enough.
+     Budget: the 5-candidate / 2-search floor above is what makes a search "attempted"; when the first candidates fail, keep going to about 8 before declaring it exhausted. Report to the user how many were tried and why each failed — one line each is enough.
   5. If the budget is exhausted with no usable file, stop searching and design the style yourself: choose palette, typography, and motion language from the topic. State the choice in one line so the user can object — and state that the search was attempted and what it hit.
 
   Whatever you pick, tell the user which reference you used — URL plus a one-line reason — before analysing it. A self-chosen style is legitimate; an unannounced or unattempted search is not.
@@ -338,16 +341,22 @@ Pilihannya:
    ```
 
    Write the result to `audio/words.json` either way (`references/RENDER.md` §3) — not `work/`, because it is the one derived file a later revision cannot faithfully recreate. Every later stage reads it: the timeline, the sync gate, and the optional subtitle and publish files.
-4. With a reference video, extract frames and read its visual language: palette, typography, composition, cut rhythm, transition types, depth. Reading those frames is an image call — see *Vision routing*, and batch all frames into one delegated call if the main model cannot see them. Measure the cut rhythm (`references/RENDER.md` §4) instead of describing it from impression. Reference is inspiration only. Never copy shots, text placement, or animation order.
+4. With a reference video, run the four-step read in `references/RENDER.md` §4 — contact sheet, motion strips, eight layers (palette, typography, composition, graphic language, motion, rhythm, sound, attention architecture), then the brief — plus the signature device and the reference's weakness. Measure cut rhythm instead of describing it from impression, and read motion from the strips, never from stills. The contact sheet and the strips are image calls — see *Vision routing*, batched into one delegated call if the main model cannot see them. The ten-line style brief from that read goes into the header of `render.<ext>` before the first scene (stage 6); it is the build's contract from the first frame to the last. The reference is a floor, not a ceiling, so at least one decision must come from the topic. Never copy shots, text placement, or animation order.
 
    Report what you found and what you will take, in Indonesian:
 
    ```
    Acuan gaya yang saya pakai: [tautan]
 
-   Yang saya ambil: latar [warna], aksen [warna], [jenis huruf],
-   potongan [cepat/tenang], transisi [jenis].
-   Yang tidak saya tiru: susunan adegan dan penempatan teksnya.
+   - Warna : latar [warna], aksen [warna], porsi [70/20/10]
+   - Huruf : [display] + [meta], rasio judul:meta [6:1]
+   - Grafik: [card r=16, garis 3 px, grain 4%, ikon grid 24]
+   - Gerak : masuk [8–12] frame, [ease-out], teks [per kata]
+   - Irama : [x] potongan, rata-rata [y] detik ([terpendek]–[terpanjang])
+   - Suara : [whoosh di tiap transisi; musik berhenti di kalimat kunci]
+   - Device: [nama device] — saya pakai dengan cara [beda]
+   - Lantai: [satu keputusan dari topik, tidak ada di referensi]
+   Yang tidak saya tiru: susunan adegan, penempatan teks, urutan animasinya.
    ```
 
    When no reference fits and you design the style yourself, say so instead:
@@ -403,46 +412,38 @@ Read both reference documents before building anything:
 - `references/GUIDE.md` — creative direction, typography, asset animation, transitions, **translating ideas into visuals (§5), cross-scene variation (§6)**, audio mixing.
 - `references/RENDER.md` — environment check, fonts, render pipeline, ffmpeg commands, verification.
 
-**Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier glyph height, WCAG contrast, text collision (coverage), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against your renderer's data structures. Do not look for a shared library; every project has its own shapes.
+**Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier cap height, WCAG contrast, text collision (coverage), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against your renderer's data structures. Do not look for a shared library; every project has its own shapes.
 
 Two checks are not optional because they protect the file itself, and both catch failures that look fine on screen:
 - **frame contiguity** before encoding (`RENDER.md` §6) — a missing PNG silently truncates the MP4;
 - **final mix loudness and tail floor** (`RENDER.md` §7) — a quiet mix or a music track that ends early passes every visual gate.
 
-Before writing scene code, give every core point one visual mechanism that can be drawn (`GUIDE.md` §5). If the plan is still "big word in the centre" for every scene, the idea isn't there yet.
+Before writing scene code, give every core point one visual mechanism that can be drawn (`GUIDE.md` §5). If the plan still reads "big word in the centre" for every scene, that is a warning sign worth revisiting before you build — not automatically wrong, but usually an idea that has not been found yet.
 
 ### Stage 7 — QC and delivery
 
 Inspect the exported MP4 from start to finish, not just the timeline editor:
 
-1. Style is inspired by the reference without copying it shot for shot.
-2. Text is legible, correctly spelled, synced to the narration, and each frame keeps **one label voice**: its captions and footnotes either match the caps-plus-tracking treatment of the other labels or take the display face — never a lone sentence-case sans line among caps (`references/GUIDE.md` §2).
+1. Style is inspired by the reference without copying it shot for shot — checked against the style brief in the header of `render.<ext>`: every line still holds, the signature device is present, and at least one decision came from the topic rather than the reference.
+2. Text is legible, correctly spelled, and synced to the narration. Captions and footnotes sit inside the safe area and are never mistaken for words the narration says (`references/GUIDE.md` §2 is guidance, not a gate).
 3. Assets appear at relevant moments, uncropped and undistorted.
 4. Transitions are smooth, varied, and purposeful.
 5. Music supports and speech stays dominant.
 6. No black frames, frozen frames, glitches, or unintended audio defects.
 7. The MP4 plays. Actual duration equals the stage-4 total (never over the active cap), frame count = duration × 30, 30 fps, codec and resolution per spec, nothing after the final second, and the cap in use is stated (60 s portrait, 300 s landscape, or the number the user approved). All of it proven from the exported file's metadata.
-8. Gates in `references/RENDER.md` §7 pass: sync (no text appears before its word), geometry (safe area, size legibility, collision, contrast), audio (no dead air inside the speech region; music present in the tail when music exists; mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP), and repetition pattern (flag only, your call). Prove it with numbers and state them in the delivery message.
+8. The measurements in `references/RENDER.md` §7 are run and reported: sync (no text appears before its word), geometry (safe area, cap height, collision, contrast), audio (no dead air inside the speech region; music present in the tail when music exists; mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP), and repetition pattern (flag only, your call). Two of them are hard requirements — frame contiguity before encoding, and the finished loudness and tail floor. The rest are advisory: report the numbers and the decision you made from them.
 9. `output/publish.txt` exists and every block in it is copy-paste ready — see *Publish copy* below. It is part of the deliverable, not an extra.
 
-Check the creative side with your eyes, not a script: open a contact sheet of the export. If the main model cannot see it, hand the sheet to the `vision` subagent — one call, *Vision routing*:
+Check the creative side with your eyes, not a script: open a contact sheet of the export sized from the actual duration. If the main model cannot see it, hand the sheet to the `vision` subagent — one call, *Vision routing*:
 
 ```bash
 mkdir -p work/check
-ffmpeg -i output/<slug>.mp4 -vf "fps=1,scale=300:-1,tile=8x8" -frames:v 1 work/check/sheet.png
-```
-
-`-frames:v 1` is required — a tile grid is one image, and without it the command fails on the second frame.
-
-The grid has to cover the whole video, and the default `fps=1` only fits 64 cells (~64 s). Size it from `DUR`, three seconds per cell for landscape so a 5-minute video still reads as one sheet:
-
-```bash
 CELLS=$(( (DUR + 2) / 3 ))                     # one thumbnail per 3 s
 SCALE=$(python3 -c "import math;print(max(1,int(math.ceil(math.sqrt($CELLS)))))")
 ffmpeg -i output/<slug>.mp4 -vf "fps=1/3,scale=240:-1,tile=${SCALE}x${SCALE}" -frames:v 1 work/check/sheet.png
 ```
 
-For a 60 s portrait video the same `fps=1/3` gives 20 cells in a 5×5 grid; for 300 s, 100 cells in 10×10. If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
+`-frames:v 1` is required — a tile grid is one image, and without it the command fails on the second frame. Sizing the grid from `DUR` is what makes the sheet cover the whole video: a fixed `fps=1` in an 8×8 tile caps the sheet at the first ~64 s. For a 60 s portrait video `fps=1/3` gives 20 cells in a 5×5 grid; for 300 s, 100 cells in 10×10. If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
 
 ### Publish copy — `output/publish.txt`
 
@@ -452,7 +453,7 @@ Rules:
 - **Derived from the finished script, never invented.** Every claim in the copy must already be said or shown in the video. No new numbers, no new promises, no clickbait the video does not deliver.
 - **One section per platform, in plain text**, separated by a blank line and a single `===` line so the user can see where each copy starts. Inside a section there is exactly one paragraph block: the caption.
 - **Caption budget**: first line is the hook and must survive truncation (~90 characters for Reels/TikTok, ~100 for Shorts before "more"). Total caption 150–300 characters per platform short-form; longer only for a landscape explainer, where 300–600 is fine.
-- **Hashtags**: 8–15 on TikTok and Reels, 3–5 on Shorts (YouTube ignores most of them and caps tags at 500 characters total). Mix one broad, two topical, one niche. No hashtag on a line of its own — append after the caption text, since a trailing hashtag wall reads like spam on Reels.
+- **Hashtags**: 8–15 on TikTok and Reels, 3–5 on Shorts (YouTube ignores most of them and caps tags at 500 characters total). Build the mix from one broad tag, several topical tags that name the subject, and at most one niche tag — the platform count sets how many topical tags you add. No hashtag on a line of its own — append after the caption text, since a trailing hashtag wall reads like spam on Reels.
 - **Language follows the video's narration language.** Indonesian narration → Indonesian captions and Indonesian hashtags (`#investasisaham`, not `#stockmarket`).
 - **Never include**: emoji walls, "link in bio" when there is no link, invented statistics, or the word "viral".
 - **Optional blocks** are allowed and must be labelled plainly: a `Judul / Title` line (the platform title field, ≤100 chars), and for YouTube a `Deskripsi` block with 2–3 short lines plus a disclaimer line when the topic is financial, medical, or legal advice. A finance video without "bukan saran investasi" is a defect, not a nicety.

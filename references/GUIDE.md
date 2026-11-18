@@ -1,6 +1,6 @@
 # Visual and Creative Direction
 
-Read this before building any scene. It covers execution — typography, asset animation, transitions, sync, audio. **Visual style always comes from the chosen reference video**; adapt to the user's assets and topic rather than imposing one palette or layout everywhere.
+Read this before building any scene. It covers execution — typography, asset animation, transitions, sync, audio. **Visual style starts from the chosen reference video when there is one**; without one, it is designed from the topic and the user's assets. Either way, don't impose one palette or layout everywhere.
 
 ## Contents
 1. Reading a reference video
@@ -14,13 +14,15 @@ Read this before building any scene. It covers execution — typography, asset a
 
 ## 1. Reading a reference video
 
-A reference is a quality bar, not a mould. What transfers is the principle — why the video feels good, not the order of its effects.
+A reference is a floor, not a mould. What transfers is the principle — why the video feels good, not the order of its effects.
 
-Look at: palette, typographic hierarchy, how text and image stack, cut rhythm, transition types, use of shadow and depth, and how motion relates to sound.
+Read eight layers — palette, typography, composition, graphic language, motion, rhythm, sound, attention architecture — with the concrete prompts and the four-step read in `RENDER.md` §4. Two of those layers exist only in time: **motion** (easing, entry duration, text granularity) and **rhythm** (cut distribution, event density). A contact sheet cannot show either; read them from motion strips. Write the result as a ten-line brief in the header of `render.<ext>`, so the read survives to the last scene.
 
-"Look at" means the model actually opens the frames. If the main model cannot see images — empty `content`, a refusal, or an `[image omitted: ...]` placeholder — hand all reference frames to the `vision` subagent in one call and work from its description (`SKILL.md` → *Vision routing*). Never describe a reference you have not seen; say so instead.
+Take at least one measured number per layer where a number exists — a size ratio, a cut interval, a stroke weight — because an adjective cannot be built.
 
-Forbidden: copying shots one by one, reusing the exact composition, placing text in the same positions, or reproducing the animation and transition order frame by frame. The goal is work that is original and tighter than its reference.
+"Look at" means the model actually opens the images. If the main model cannot see them — empty `content`, a refusal, or an `[image omitted: ...]` placeholder — hand the contact sheet and the motion strips to the `vision` subagent in one call and work from its description (`SKILL.md` → *Vision routing*). Never describe a reference you have not seen; say so instead.
+
+Avoid copying shots one by one, reusing the exact composition, placing text in the same positions, or reproducing the animation and transition order frame by frame. The goal is work that is original and tighter than its reference — a frame that takes the principle and serves the content beats a faithful copy.
 
 ## 2. Kinetic typography
 
@@ -33,36 +35,35 @@ Rules:
 
   **The font catalogue is not a menu.** The list in `RENDER.md` §"Fonts ready to use" is what happens to be installed, not the set of allowed choices. Your job is to pick typography that **fits the topic and the reference mood**, not the first row of the table. If the topic needs something missing (a food topic wanting a fat slab serif, an archive topic wanting a heavy condensed face, a tech topic wanting a narrow grotesk), **download it** — never settle for "close enough" just because it's installed. The download recipe and verification are in `RENDER.md` §1.
 
-  The limit is quantity, not typeface: at most 2–3 families per video so it stays one system. Verify with `fc-list` or `fc-query` before using it in a scene.
+  The practical limit is coherence, not a count: **2–3 families is the range that usually holds together** as one system. More than that rarely does — but if a concept genuinely needs a fourth voice, that is a design decision, not a violation. Verify with `fc-list` or `fc-query` before using it in a scene.
 - Preserve spelling and meaning exactly as scripted.
-- Break copy into short phrases. Never show a whole paragraph at once. Highlight keywords only.
+- Keep on-screen copy short: a whole paragraph at once rarely reads on video. Highlighting keywords is the usual way to give the eye a path through a line; a line that needs every word emphasised has no emphasis at all.
 - Keep clear levels: title, keyword, supporting line, small label.
-- **The label layer speaks with one voice.** Header, index, kicker, chip, caption and footnote are the frame's *meta-copy* — words about the video, not words of the video, read without being heard. Every piece of meta-copy in one frame therefore takes the same treatment:
-  - **uppercase in the supporting sans, tracked 4–8 px**, when the line is short (a label, an index, a chip, a one- to three-word caption); or
+- **The label layer usually reads best with one voice.** Header, index, kicker, chip, caption and footnote are the frame's *meta-copy* — words about the video, not words of the video. A default that works in most frames:
+  - **uppercase in the supporting sans, tracked 4–8 px**, when the line is short (a label, an index, a chip); or
   - **the display face, usually italic**, when the caption reads as a phrase or a sentence rather than a bare label.
 
-  The trap is a single sentence-case sans line left alone among caps labels. It stops reading as part of the design and starts reading as a tooltip or a settings note — the interface voice of the face showing through, which is exactly what makes a frame look like a template. The same trap in its weaker form: small supporting labels set in a plain sans at regular weight read as standard-issue UI text (measured against a real build, revised: every meta label moved to a characterful face). The fix that held up in practice — **one two-family system for the whole video**, where the meta face is chosen **by topic register**:
-  - **display face** for everything spoken-content and emphatic (titles, claims, keywords, stamps, verdict badges);
-  - **a characterful meta face**, uppercase + tracked 4–8 px, for *every* meta label, chip, caption, index and footnote — a mono (e.g. `JetBrains Mono`) carries the right technical register for tech and data topics; an editorial or historical topic may want a serif italic or small-caps serif instead. The constant is that all meta-copy shares ONE distinctive voice — which face carries it is a per-topic decision;
-  - quoted claims stay sentence case even in the display face (never uppercase a claim), and digits/counters live in the meta face as data.
-  Two families total: display + meta voice. A third sans between them is the "standard and lowercase" mush this rule exists to kill. And the system itself must not harden into a template — mono everywhere is what this rule becomes if nobody re-asks "does a mono fit *this* topic?".
-- **Do not police case anywhere else.** Spoken content — a claim, a quote, a sentence the narration also says — keeps its natural case and punctuation in whatever face it uses, and a project may deliberately set content lines in sentence-case sans as its "plain voice". The rule above is about meta-copy, not about banning lowercase.
-- **Never uppercase a quoted claim or a proper noun**, even where a label would fit: caps make the frame look like it endorses those words as its own headline. A myth, a quote or a reported claim stays sentence case.
-- **Caps without tracking read as a form, not a label.** Add the tracking, keep the line short, and measure the **cap height** (not the ascender box) against the size tier — uppercase lines are uniform height, so the size that clears 2.5% for mixed case will usually not clear it in caps.
+  The risk worth a decision: a single sentence-case sans line left alone among caps labels starts reading as a tooltip or a settings note — the interface voice of the face showing through. That is a reason to choose deliberately, not a ban.
+  **Two families — display + meta — is a reliable system for most videos.** The display face carries spoken content and emphasis (titles, claims, keywords, stamps, verdict badges); the meta face carries labels, indices, chips, captions and footnotes. Which face carries the meta voice is a per-topic decision: a mono (e.g. `JetBrains Mono`) fits tech and data, a serif italic or small-caps serif fits editorial or historical topics, handwriting can carry annotation when the topic is personal. A third family earns its place when it has a distinct job — and any system here has to keep re-asking "does this face fit *this* topic?", because mono everywhere is what this paragraph becomes if nobody does.
+- **Case is a design decision, not a rule.** Spoken content — a claim, a quote, a sentence the narration also says — keeps its natural case and punctuation in whatever face it uses, and setting a project's plain voice in sentence-case sans is legitimate.
+- **Uppercasing a claim changes who appears to say it.** Caps read as the video's own assertion, so a myth, a quote or a reported claim set in caps can look endorsed. If the design wants caps there, check that the meaning survives; proper nouns keep their spelling either way.
+- **Caps usually want tracking.** Without it, an uppercase line reads as a form rather than a label. Keep the line short, and measure the **cap height** — not the full ascender-to-descender box, which adds descenders and makes a lowercase-only line look far smaller than its caps — against the size tier. Uppercase lines are uniform height, so the size that clears 2.5% in mixed case will usually not clear it in caps.
 - Avoid decorative capitalisation inside sentence-case copy, hard-to-read faces, and ornamental excess.
 - Respect the safe area: important elements stay at least **4%** from the frame edge — one number, so there is never a second truth about it (the geometry gate in `RENDER.md` §7 uses 4%).
 
-  **Short-form platforms need more.** 4% is the floor for the file itself; on Reels, TikTok, Shorts and Stories the platform UI covers roughly the bottom 12–15% and the right 10–12% with captions, buttons and progress. For a **portrait** export (`1080×1920`), keep primary text inside **10% from the bottom and 12% from the right**, and say in the delivery message which zone you used. Landscape/YouTube keeps the plain 4%. This is a platform constraint, not taste — measure it, and never let a keyword land in the covered band. The 4% gate still runs on everything; the platform band is a second, stricter margin applied on top for portrait.
-- The smallest text must stay legible at output resolution. **The threshold is glyph height, not font size.** Two tiers, measured as a fraction of the **short side** so portrait and landscape share one number:
+  **Short-form platforms need more.** 4% is the floor for the file itself; Reels, TikTok, Shorts and Stories overlay their own captions, buttons and progress bar on the bottom and right of the frame, and that band varies by app version and layout. For a **portrait** export (`1080×1920`) the project's floor is **10% from the bottom and 12% from the right**, and the delivery message states the zone used. Treat the 10% as a minimum, not a target: anything that has to be read — a keyword, a number, a verdict — is safer at **15% from the bottom**. Landscape/YouTube keeps the plain 4%. The 4% gate still runs on everything; the platform band is a second, stricter margin applied on top for portrait.
+- The smallest text must stay legible at output resolution. **The threshold is cap height, not font size.** Two tiers, measured as a fraction of the **short side** so portrait and landscape share one number:
 
-  | Tier | Glyph height | Short side 1920 | Short side 1080 |
+  | Tier | Cap height | Short side 1920 | Short side 1080 |
   |---|---|---|---|
   | primary / keywords | ≥ 4% | 77 px | 43 px |
   | supporting / labels / chips | ≥ 2.5% | 48 px | 27 px |
 
-  Font size to reach that height depends on the face: measured on DejaVu Sans Bold, capitals are **0.73× the size**. So on a 1080 short side, primary needs **size ≈ 60** and supporting **≈ 37**; on 1920, **≈ 105** and **≈ 66**. A condensed or display face has a different ratio — measure `textbbox` once for the font you chose and solve for the size; never assume 0.75 or copy a number from a table for a different face.
+  Font size to reach that height depends on the face: measured on DejaVu Sans Bold, capitals are **0.73× the size**. So on a 1080 short side, primary needs **size ≈ 60** and supporting **≈ 37**; on 1920, **≈ 105** and **≈ 66**. A condensed or display face has a different ratio — measure `font.getbbox("H")` for the font you chose and solve for the size; never assume 0.75 or copy a number from a table for a different face.
 
   Writing only the 1920 figures is what makes a landscape video ship with text half the intended size. Measure the result; don't estimate.
+
+  Measure the **cap height**, not the full string box. Mixed case adds descenders, and a lowercase-only line returns x-height — about 0.58× the size on DejaVu Sans Bold, against 0.73× for capitals — so a gate fed `textbbox` height would demand type roughly 25% larger than this table intends, and would fail a correctly sized word like "sun". Measure a reference capital (`font.getbbox("H")`) once per face, or the script's tallest glyph for non-Latin writing systems.
 
   If a supporting line will not fit at 2.5% alongside other elements, cut words from that line — never lower the threshold.
 - Check text-against-background contrast in code, never by judging colour names. Thresholds are measurable and tied to the text's **role**, not its pixel size:
@@ -84,24 +85,29 @@ def ratio(a, b):
     return (la + 0.05) / (lb + 0.05)
 ```
 
-  On failure: place a solid panel behind the text or darken the area — never rely on a thin drop shadow. Text over user images must be measured against the pixels actually behind it (sample the region), not the image's dominant colour.
+  On failure: place a solid panel behind the text or adjust the area — darker behind light text, lighter behind dark text — never rely on a thin drop shadow. Text over user images must be measured against the pixels actually behind it (sample the region), not the image's dominant colour.
 
   **Pick the accent by measurement, not by eye.** A palette pass that removes the whole failure class: choose the topic's hue, then walk its lightness until the measured ratio clears the threshold for the role it will carry.
 
 ```python
 import colorsys
 def fit_accent(rgb, bg, target):
-    """Darken/lighten `rgb` in HSL until it clears `target` against `bg`."""
+    """Walk lightness in BOTH directions until `rgb` clears `target` against `bg`.
+    Darkening alone fails on dark palettes: black on a dark background is ~1.07:1."""
     h, l, s = colorsys.rgb_to_hls(*(c / 255 for c in rgb))
-    for _ in range(60):
-        cand = tuple(round(c * 255) for c in colorsys.hls_to_rgb(h, l, s))
-        if ratio(cand, bg) >= target:
-            return cand
-        l = max(0.0, l - 0.012)
-    return (0, 0, 0)                     # fall back to ink, never to a failing colour
+    best, best_r = rgb, ratio(rgb, bg)
+    for step in range(1, 101):
+        for cand_l in (min(1.0, l + step * 0.01), max(0.0, l - step * 0.01)):
+            cand = tuple(round(c * 255) for c in colorsys.hls_to_rgb(h, cand_l, s))
+            r = ratio(cand, bg)
+            if r >= target:
+                return cand
+            if r > best_r:
+                best, best_r = cand, r
+    raise ValueError(f"{target}:1 unreachable on {bg}; best {best_r:.2f} — change hue or saturation")
 ```
 
-Run it once per role (primary 3.0, supporting 4.5) and use the result everywhere the accent carries text. The accent then stays one colour across the video — `§6`'s "hold one thing constant" — while never shipping an unreadable pair.
+Run it once per role (primary 3.0, supporting 4.5) and use the result everywhere the accent carries text. On a dark background the answer is nearly always **lighter**, not darker; if neither direction reaches the target, the hue or saturation has to change — returning a colour that fails the ratio is exactly the bug this function exists to prevent.
 - **Centring is measured, not delegated to `anchor`.** `anchor="mm"` centres the font's em box, not the glyph shape — numerals, capital titles, and text with descenders visibly drift inside a shape. For text sitting inside an object (a numeral in a circle, a label on a card, text in a colour block), offset by the glyph bbox:
 
 ```python
@@ -117,7 +123,7 @@ d.text((px - dx, py - dy), s, font=f, anchor="mm", fill=fill)
 
 ## 3. Animating assets
 
-Assets must not sit still *by accident*. When a scene would be still, first ask whether stillness is the right choice here — a held frame after a verdict can land harder than motion. If stillness is intentional, write it in the timeline and keep it brief; if not, add micro camera motion (slow zoom drift or a gentle pan). What fails QC is an *undocumented* static scene (`RENDER.md` §7): motion is the default, stillness is a decision.
+Assets should not sit still *by accident*. When a scene would be still, first ask whether stillness is the right choice here — a held frame after a verdict can land harder than motion. If stillness is intentional, write it in the timeline with how long it holds; if not, add micro camera motion (slow zoom drift or a gentle pan). What fails QC is an *undocumented* static scene (`RENDER.md` §7): motion is the default, stillness is a decision.
 
 The lower bound is not taste, it is the encoder: motion that is too small (radius <15 px, shift <10 px) can be quantised away at CRF 18+, leaving identical frames. Measure the motion; don't assume.
 
@@ -182,13 +188,13 @@ A video with a dozen or more scenes slides easily into "same layout, different w
 
 - **Vary composition**, not just content: text left + image right, plain centred text, text hugging an edge, text layered behind an object, very small text in a wide space.
 - **Vary density**: dense scenes (many elements) alternating with airy ones (one element, lots of space). Uniform density exhausts the viewer.
-- **Vary background**: light/dark may alternate, but hold one accent colour across the whole video so it reads as one family. On a long piece this is what keeps sections distinct without breaking the system; change the background per section, not per scene, or it becomes noise.
+- **Vary background**: light/dark may alternate. Holding one accent colour across the video is the most reliable way to keep it reading as one family, and changing the background per section rather than per scene usually behaves better on a long piece. Both are defaults, not obligations — a deliberately multi-hue palette is legitimate when the concept is sectional.
 - **Vary scale**: one scene with an oversized element bleeding off-frame makes the rest feel airy even at normal size.
-- **Hold one thing constant**: one accent colour, one display face, one dominant motion type. That constant is what makes the variation feel intentional rather than random.
+- **Hold one thing constant** — an accent, a display face, a dominant motion type. That constant is what makes the variation feel intentional rather than random.
 
 Check the result with a contact sheet (`ffmpeg ... tile`) before export: if every thumbnail follows the same pattern, variation is insufficient. A model without vision delegates that look to the `vision` subagent — one call, then judge from the returned description.
 
-**Make the check quantitative.** Rate each scene on four axes and keep the vector beside the timeline; three consecutive scenes on the same vector is the failure, not two.
+**Make the check quantitative.** Rate each scene on four axes and keep the vector beside the timeline; three consecutive scenes on the same vector is the flag, not two.
 
 ```python
 scene["vary"] = dict(
@@ -199,7 +205,7 @@ scene["vary"] = dict(
 )
 ```
 
-Two identical neighbours can be a deliberate pair (a before/after, a repeat motif). Three is the signature of a template. `RENDER.md` §7's repetition gate measures the same thing from the rendered pixels and prints it; this vector is what you consult while planning, before any frame is drawn.
+Two identical neighbours can be a deliberate pair (a before/after, a repeat motif). Three in a row is the signature of a template unless you have a written reason. `RENDER.md` §7's repetition gate measures the same thing from the rendered pixels and prints it; this vector is what you consult while planning, before any frame is drawn.
 
 ## 7. Sync with the voiceover
 
@@ -213,7 +219,7 @@ Motion must feel like a response to the voice, not random spinning. Visual effec
 
 Text without a supporting word in the voiceover remains legitimate (silent emphasis) — record the reason in the timeline; do not delete it merely because the sync gate cannot verify it.
 
-**Captions are a second, separate layer.** Kinetic typography is the design; burned-in captions are the accessibility and retention baseline every short-form platform expects. If the user wants them, they come from the same `audio/words.json` (`RENDER.md` §3) and never replace the kinetic type — style them small, low, and steady, in the covering safe zone (`§2`), with at most 3 words per cue. A subtitle file (`output/<slug>.srt`) and the upload copy (`output/publish.txt`) are free from the same data; offer them whenever the video is going to a platform.
+**Captions are a second, separate layer.** Kinetic typography is the design; burned-in captions are the accessibility and retention baseline every short-form platform expects. If the user wants them, they come from the same `audio/words.json` (`RENDER.md` §3) and never replace the kinetic type — style them small, low, and steady, in the covering safe zone (`§2`); three words per cue is a good default, not a limit. A subtitle file (`output/<slug>.srt`) and the upload copy (`output/publish.txt`) are free from the same data; `publish.txt` is written on every delivery (`SKILL.md`), and the `.srt` is offered whenever the video is going to a platform.
 
 ## 8. Music and audio mixing
 
@@ -221,9 +227,10 @@ Text without a supporting word in the voiceover remains legitimate (silent empha
 - Align some transitions or animation accents to the beat when it genuinely suits the narration.
 - Use sound effects sparingly; they never compete with the narrator.
 - Never speed up speech or cut words to hit a duration. Preserve natural rhythm and pauses.
-- Fade music out smoothly and end audio exactly on the final second — no tail, no abrupt cut. Fade **to a floor, not to absolute zero**: measured, ending the fade exactly on the last frame leaves the final 0.8 s at −61.7 dB, which is indistinguishable from the music having died. The recipe in `RENDER.md` §6 does this with a `volume` expression.
+- Fade music out smoothly so it ends with the picture — no audio beyond the final frame, no abrupt cut. Fade **to a floor, not to absolute zero**: measured, ending the fade exactly on the last frame leaves the final 0.8 s at −61.7 dB, which is indistinguishable from the music having died. The recipe in `RENDER.md` §6 does this with a `volume` expression.
 - Prevent clipping, distortion, sudden level changes, and unintended silence. Measure the finished mix: **I between −17 and −14 LUFS, true peak ≤ −1 dBTP** (`RENDER.md` §7). A quiet mix passes every other gate and still plays badly on every platform.
 - Music must be **looped to the video length**, not played once (`-stream_loop -1`). A 10 s track on a 28 s video otherwise leaves 18 s of silence.
+- If you download a track instead of synthesising one, apply the same licence rule as images (`RENDER.md` §4): public domain, CC0, or an explicit permissive licence, credited in the delivery message.
 - If the video is a beat-driven piece, derive the beat grid from the music instead of guessing: a tempo estimate plus the scene-change times is enough to snap transitions to the pulse. Keep it subtle — the narration leads, the beat supports.
 
 Tempo from the music itself — onset strength, then the median gap between onsets:
