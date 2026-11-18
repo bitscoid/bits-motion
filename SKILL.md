@@ -184,28 +184,31 @@ kecuali suara — suara yang menentukan panjang dan penyesuaian waktu video.
    Kalau tidak ada, saya membuat musik sederhana sendiri, atau video tanpa musik.
 
 3. Video acuan gaya (opsional)
-   Video yang tampilannya Anda suka. Kalau tidak ada, saya carikan di Pinterest
-   sesuai topik, atau Anda beri arahan singkat: warna, suasana, jenis huruf.
+   Video yang tampilannya Anda suka, atau tautan Pinterest. Kalau tidak ada,
+   saya carikan sendiri yang paling sesuai dengan topik. Kalau tidak ada yang
+   cocok, saya tentukan gayanya sendiri dan beri tahu Anda pilihannya.
 
 4. Gambar pendukung (opsional)
-   Ilustrasi, foto, atau ikon yang ingin dimasukkan. Kalau tidak ada, semua
-   elemen visual saya gambar lewat kode.
+   Ilustrasi, foto, atau ikon yang ingin dimasukkan. Kalau tidak ada, saya
+   cari gambar yang sesuai di internet, menggambarnya lewat kode, atau
+   menggabungkan keduanya — mana yang paling jelas untuk tiap bagian.
 
 5. Orientasi layar
    Tegak (1080×1920, cocok untuk Reels/TikTok/Shorts) atau
    mendatar (1920×1080)? Kalau tidak disebut, saya pakai mendatar.
 
 Anda tidak perlu mengganti nama berkasnya. Kirim apa adanya, saya yang
-merapikan. Kalau Anda ingin saya yang mengatur semuanya, cukup bilang
-"serahkan ke AI".
+merapikan. Kalau Anda tidak ingin menyiapkan apa pun, cukup bilang
+"buat semuanya otomatis" — saya yang memilih acuan gaya, gambar, dan
+tipografinya.
 ```
 
 | Media | Lands at | Status | If the user has none |
 |---|---|---|---|
 | Voiceover recording | `audio/voiceover.wav` | Strongly recommended; it is the timing source | See "Without a voiceover" below |
 | Background music | `audio/music.wav` | Optional | You generate simple music, or render silent |
-| Style reference video | `assets/reference.mp4` | Optional | You find one on Pinterest for the topic (`references/RENDER.md` §4); if that fails, ask |
-| Supporting images (1st, 2nd, …) | `assets/image-01.png`, `assets/image-02.png`, … | Optional | You draw graphic elements in code |
+| Style reference video | `assets/reference.mp4` | Optional | Search Pinterest for `motion graphics` + topic keywords (stage 3); if nothing fits, design the style yourself |
+| Supporting images (1st, 2nd, …) | `assets/image-01.png`, `assets/image-02.png`, … | Optional | You find suitable images online, draw them in code, or both |
 | Screen orientation | — | Ask | Default landscape 1920×1080; portrait 1080×1920 |
 
 The table above is for your own reference. What reaches the user is the Indonesian block. Typography is **not** asked about — that is your call in stage 4, and if the right font is not installed you download it.
@@ -214,17 +217,20 @@ The table above is for your own reference. What reaches the user is the Indonesi
 
 - **Everything needed is present:** proceed without further questions. Treat user assets as the primary material. Tell the user in one line: `Semua bahan sudah lengkap. Saya mulai kerjakan.`
 - **Something is missing and unanswered:** ask. Never guess.
-- **The user declines to supply a reference or asks for automatic:** find a reference video on Pinterest that fits the topic (procedure and quality filter in `references/RENDER.md` §4) and state the assumption in one sentence. If every search and download fails, stop and ask:
+- **The user supplies a Pinterest URL as the reference:** do not ask again — that URL is the reference. Download it and continue.
 
+  ```bash
+  yt-dlp "<pinterest-url>" -o "assets/reference.mp4"
   ```
-  Saya belum menemukan video acuan yang cocok untuk topik ini.
 
-  Ada dua pilihan:
-  1. Anda kirimkan berkas video atau tautannya
-  2. Anda beri arahan singkat: warna, suasana, dan jenis huruf yang Anda mau
+  Then probe it. If it fails (region block, removed pin, no video stream, under 5 s, or under the planned resolution), say so once and fall back to the search path below — never silently drop the style anchor.
+- **The user declines to supply a reference, or asks for everything automatic:** search Pinterest yourself, in this order:
+  1. Search with the topic's keywords plus `motion graphics` — e.g. `pinterest.com pin <topic keywords> motion graphics video`. Collect 3–5 candidate pins.
+  2. Judge fit: does the palette, typography, and motion feel match the topic's character? Pick the closest.
+  3. If nothing matches the topic, pick one that is *roughly* related — same broad mood (calm/serious/energetic), same kind of subject matter.
+  4. If even that fails, stop searching and design the style yourself: choose palette, typography, and motion language from the topic. State the choice in one line so the user can object.
 
-  Saya tidak memakai gaya bawaan, karena hasilnya akan terasa generik.
-  ```
+  Whatever you pick, tell the user which reference you used — URL plus a one-line reason — before analysing it. A self-chosen style is legitimate; an unannounced one is not.
 - **An important file will not open or is corrupt:** tell the user. Never pretend it was processed.
 
   ```
@@ -232,7 +238,15 @@ The table above is for your own reference. What reaches the user is the Indonesi
   tidak didukung. Bisa kirim ulang, atau saya lanjut tanpa berkas itu?
   ```
 
-When the user supplies images, build every visual from those images and adapt them to the voiceover. Never substitute generic stock. Without images, draw your own graphic elements in code (shapes, icons, vector illustration, typography, diagrams). Be honest that these are code-drawn graphics, not photographs or photorealistic AI images.
+**Visual material — three sources, pick per scene.**
+
+1. **User images.** When supplied, build those visuals from them and adapt them to the voiceover. Never swap them for generic stock.
+2. **Images you find and download.** When the script calls for something concrete (a place, an object, a document, a historical photo), search the web for a suitable image, download it, and verify it: correct subject, licence allows use, resolution at least the output resolution, no watermark. Save to `assets/image-01.png` (next number), record the source URL in the delivery message, and never pass off a found image as the user's.
+3. **Code-drawn graphics.** Shapes, icons, vector illustration, typography, diagrams — always available and always yours.
+
+Mixing them is normal and often best: a downloaded photograph with code-drawn annotations on top, a code-drawn diagram with one user image inside it. Choose per scene by what communicates fastest. Be honest about which is which: code-drawn graphics are not photographs, and a found image is not the user's own.
+
+If a needed image cannot be found or licensed, draw it in code rather than shipping a wrong or low-resolution one.
 
 **Without a voiceover.** Check `GEMINI_API_KEY` and generate voice through Gemini TTS, choosing a voice that fits the topic (`references/RENDER.md` §3). If the key is absent or fails, do not pretend:
 
@@ -273,7 +287,15 @@ Pilihannya:
    potongan [cepat/tenang], transisi [jenis].
    Yang tidak saya tiru: susunan adegan dan penempatan teksnya.
    ```
-5. **Choose typography from the topic, not from what happens to be installed.** State the choice and reasoning in one sentence. If that font is missing, download it before writing scene code — recipe and verification in `references/RENDER.md` §1. Never start building with a font that merely exists and then bend the design toward it; that order produces generic work.
+
+   When no reference fits and you design the style yourself, say so instead:
+
+   ```
+   Tidak ada acuan yang benar-benar cocok untuk topik ini, jadi saya tentukan
+   sendiri: latar [warna], aksen [warna], tipografi [jenis], gerak [sifat].
+   Kalau Anda punya contoh tampilan yang lebih Anda suka, kirim saja.
+   ```
+5. **Choose typography from the topic and the reference, never from what happens to be installed.** Read the reference's type register first, then match a family to the topic's character. State the choice and reasoning in one sentence. If that font is not in the catalogue and not installed, search the internet for one that fits, download it, and verify it before writing scene code — recipe in `references/RENDER.md` §1. Never start building with a font that merely exists and then bend the design toward it; that order produces generic work.
 
    ```
    Tipografi: [nama keluarga huruf] untuk [peran], karena [alasan singkat

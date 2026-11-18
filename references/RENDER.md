@@ -43,13 +43,16 @@ Match to the video's mood; at most 2–3 families per video (one display + one s
 
 | Mood / style | Fonts | Notes |
 |---|---|---|
-| Modern, neutral, UI-like | `Poppins` (Regular/SemiBold/Bold), `Inter`, `Montserrat`, `Manrope` | Safe standard for narration and body text |
-| Playful, doodle, rounded | `Baloo 2`, `Fredoka`, `Quicksand`, `Nunito` | Light topics, informal education, children/youth |
-| Handwriting, annotation | `Caveat`, `Patrick Hand`, `Indie Flower`, `Kalam` | Annotation accents, arrows, scribbles |
-| Elegant / retro script | `Pacifico`, `Dancing Script` | Wordmarks, casual headlines — never body text |
-| Impact, kinetic type | `Bebas Neue`, `Anton`, `Archivo Black`, `Oswald` | Big keywords, hooks, statistics |
-| Editorial / firm serif | `Fraunces`, `Instrument Serif`, `Libre Caslon Text` | Quotes, large figures, history or serious topics |
-| Technical / data / mono | `JetBrains Mono`, `Space Mono`, `Space Grotesk` | Small labels, statistics, data and tech feel |
+| Modern, neutral, UI-like | `Poppins` (Regular/SemiBold/Bold), `Inter`, `Montserrat`, `Manrope`, `DM Sans`, `Figtree` | Safe standard for narration and body text |
+| Playful, doodle, rounded | `Baloo 2`, `Fredoka`, `Quicksand`, `Nunito`, `Gochi Hand` | Light topics, informal education, children/youth |
+| Handwriting, annotation | `Caveat`, `Patrick Hand`, `Indie Flower`, `Kalam`, `Gochi Hand` | Annotation accents, arrows, scribbles |
+| Elegant / retro script | `Pacifico`, `Dancing Script`, `Shrikhand` | Wordmarks, casual headlines — never body text |
+| Impact, kinetic type | `Bebas Neue`, `Anton`, `Archivo Black`, `Oswald`, `Archivo`, `Unbounded`, `Syne` | Big keywords, hooks, statistics |
+| Editorial / firm serif | `Fraunces`, `Instrument Serif`, `Libre Caslon Text`, `DM Serif Display`, `Newsreader`, `Gloock` | Quotes, large figures, history or serious topics |
+| Technical / data / mono | `JetBrains Mono`, `Space Mono`, `Space Grotesk`, `IBM Plex Mono`, `Sora`, `Epilogue` | Small labels, statistics, data and tech feel |
+| Expressive / display | `Bricolage Grotesque`, `Shrikhand`, `Unbounded`, `Syne` | Titles that carry personality — use once per video, never for body |
+
+Mix across categories freely, but only 2–3 families per video. The catalogue exists to widen the range of moods available, not to prescribe which one to pick.
 
 Usage: in CSS/Remotion use the family name exactly as `fc-list` reports it (e.g. `"Baloo 2"`, `"Bebas Neue"`); in PIL use the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`). Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file — set `font-weight` in CSS, or in PIL call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
 
@@ -248,19 +251,52 @@ For a URL from the user, download with `yt-dlp "<url>" -o "assets/reference.mp4"
 
 ### Finding a reference on Pinterest (when the user gives none)
 
-If the user supplies no reference file or URL (or chooses "hand it to the AI"), find a video that fits the topic:
+If the user supplies no reference file or URL (or asks for everything automatic), search in this order — do not stop at the first failure:
 
-1. Search for candidate video pins using the available web search tool: queries like `pinterest.com pin <topic keywords> video` (try Indonesian and English). Collect 3–5 candidate pin URLs.
-2. Download candidates one at a time until one works:
+1. **Search with `motion graphics` plus the topic.** Queries like `pinterest.com pin <topic keywords> motion graphics video` (try Indonesian and English). Collect 3–5 candidate video pins.
+2. **Judge fit, not just relevance.** Compare each candidate against the topic's character: is the palette right for this subject? Is the typography at the right register (serious, playful, archival, technical)? Is the motion pace suited to the narration? Pick the closest.
+3. **If nothing fits well, take something loosely related** — same broad mood or same kind of subject matter, even if the content differs. A calm paper-craft pin is a better style anchor for a serious topic than an energetic neon clip that happens to share keywords.
+4. **If even that fails, design the style yourself.** Choose palette, typography, and motion language from the topic and say so in one line, e.g. `Tidak ada acuan yang cocok, jadi saya tentukan sendiri: latar gelap, aksen hangat, tipografi tebal.` A self-designed style is legitimate; an unannounced one is not.
 
-   ```bash
-   yt-dlp "<pin-url>" -o "assets/reference.mp4"
-   ```
+Download candidates one at a time until one works:
 
-3. Filter before use — check with `ffprobe` and discard candidates that: run under 5 s or over 90 s, sit below the planned output resolution, have no video stream, or are unrelated to the topic. Discarded → try the next.
-4. If every candidate fails, do not force it. Tell the user and ask: supply the file or URL themselves, or give a short style direction (palette, font, mood). There is no default style — never proceed without a style anchor.
+```bash
+yt-dlp "<pin-url>" -o "assets/reference.mp4"
+```
+
+Filter before use — check with `ffprobe` and discard candidates that: run under 5 s or over 90 s, sit below the planned output resolution, have no video stream, or are visually unusable. Discarded → try the next.
+
+**When the user supplies the Pinterest URL themselves**, skip the search entirely: that URL is the reference. Download it with the same command. If it fails (region block, removed pin, no video stream), say so once, then fall back to the search order above — never silently drop the style anchor.
 
 Self-found quality is uncontrolled. Required: tell the user which reference you picked (URL plus a one-line reason) before analysing, and treat it as inspiration, not a mould.
+
+### Sourcing images
+
+Three sources; choose per scene by whatever communicates fastest.
+
+1. **User images** — always the primary material when supplied.
+2. **Images you find and download** — for concrete subjects the script names: a place, an object, a document, a historical photo.
+3. **Code-drawn graphics** — shapes, icons, vector illustration, diagrams. Always available, always yours.
+
+Mixing is normal: a downloaded photograph with code-drawn annotations, a code-drawn diagram holding one user image. Never pass a found image off as the user's own.
+
+When downloading, verify before use:
+
+```bash
+# resolution must be at least the output resolution after any crop
+python3 -c "from PIL import Image; im=Image.open('candidate.png'); print(im.size)"
+```
+
+Checklist — discard and search again if any fails:
+- **Subject matches** what the script says, not merely the query word.
+- **Resolution** at least the output size in the dimension it will occupy. A 600 px image stretched to 1080 px is visibly broken.
+- **No watermark, no overlaid text, no visible stock-site branding.**
+- **Licence permits use.** Prefer public domain, CC0, or an explicit permissive licence; note the source and licence in the delivery message.
+- **No person identifiable in a way the video would misrepresent.** If unsure, choose another image or draw it in code.
+
+Save as `assets/image-01.png`, `image-02.png`, … in the order they enter the video. Record every source URL and hand it to the user in the delivery message.
+
+If nothing suitable exists or the licence is unclear, **draw it in code** rather than ship a wrong or low-resolution asset.
 
 ## 5. Building frames deterministically
 
