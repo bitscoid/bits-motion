@@ -133,13 +133,13 @@ Video pendek dengan belasan scene mudah jatuh jadi "slide yang sama, kata berbed
 - **Variasikan skala**: satu scene dengan elemen raksasa yang memotong frame akan membuat scene lain terasa lapang, meski ukurannya biasa.
 - **Jaga satu hal tetap**: satu warna aksen, satu font display, satu jenis gerak dominan. Yang tetap itulah yang membuat variasi terasa disengaja, bukan acak.
 
-Periksa hasilnya dengan contact sheet (`ffmpeg ... tile`) sebelum ekspor: kalau semua thumbnail terlihat seperti template yang sama, variasinya belum cukup.
+Periksa hasilnya lewat lembar kontak (`ffmpeg ... tile`) sebelum ekspor: kalau semua bingkai kecilnya terlihat mengikuti satu pola yang sama, variasinya belum cukup.
 
 ## 7. Sinkronisasi dengan voiceover
 
 Voiceover adalah acuan timing utama, sedangkan durasi total video ditetapkan di Tahap 4 SKILL.md (durasi suara + pembuka dan penutup, dibatasi `MAX_DUR` yang default-nya 60 detik).
 
-Timing per kata diambil dari suara itu sendiri lewat ASR word-timestamp, bukan dari jumlah kata (`RENDER.md` §3). Semua kemunculan teks dibaca dari satu tabel waktu absolut (`RENDER.md` §5), dan hasilnya dibuktikan gerbang sinkron (`RENDER.md` §7): teks tidak boleh muncul sebelum katanya.
+Timing per kata diambil dari suara itu sendiri lewat pengenalan suara ber-timestamp per kata, bukan dari jumlah kata (`RENDER.md` §3). Semua kemunculan teks dibaca dari satu tabel waktu absolut (`RENDER.md` §5), dan hasilnya dibuktikan gerbang sinkron (`RENDER.md` §7): teks tidak boleh muncul sebelum katanya.
 
 Untuk setiap frasa penting: tampilkan teks saat kata itu diucapkan, munculkan aset saat relevan, tekankan kata kunci lewat skala/warna/bobot/posisi/gerak, berikan jeda visual singkat ketika penonton butuh waktu mencerna, dan sesuaikan kecepatan animasi dengan ritme pembicara.
 
