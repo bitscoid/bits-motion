@@ -170,6 +170,36 @@ In the same message as the script (or after approval), show the media list and a
 
 The user does not name files — you normalise every name on arrival.
 
+**Print this to the user, in Indonesian:**
+
+```
+Untuk membuat videonya, saya bisa memakai bahan dari Anda. Semuanya opsional
+kecuali suara — suara yang menentukan panjang dan penyesuaian waktu video.
+
+1. Rekaman suara (paling saya sarankan)
+   Format apa pun: mp3, wav, m4a. Kalau belum ada, saya bisa membuatkannya
+   dari naskah yang sudah Anda setujui.
+
+2. Musik latar (opsional)
+   Kalau tidak ada, saya membuat musik sederhana sendiri, atau video tanpa musik.
+
+3. Video acuan gaya (opsional)
+   Video yang tampilannya Anda suka. Kalau tidak ada, saya carikan di Pinterest
+   sesuai topik, atau Anda beri arahan singkat: warna, suasana, jenis huruf.
+
+4. Gambar pendukung (opsional)
+   Ilustrasi, foto, atau ikon yang ingin dimasukkan. Kalau tidak ada, semua
+   elemen visual saya gambar lewat kode.
+
+5. Orientasi layar
+   Tegak (1080×1920, cocok untuk Reels/TikTok/Shorts) atau
+   mendatar (1920×1080)? Kalau tidak disebut, saya pakai mendatar.
+
+Anda tidak perlu mengganti nama berkasnya. Kirim apa adanya, saya yang
+merapikan. Kalau Anda ingin saya yang mengatur semuanya, cukup bilang
+"serahkan ke AI".
+```
+
 | Media | Lands at | Status | If the user has none |
 |---|---|---|---|
 | Voiceover recording | `audio/voiceover.wav` | Strongly recommended; it is the timing source | See "Without a voiceover" below |
@@ -178,26 +208,77 @@ The user does not name files — you normalise every name on arrival.
 | Supporting images (1st, 2nd, …) | `assets/image-01.png`, `assets/image-02.png`, … | Optional | You draw graphic elements in code |
 | Screen orientation | — | Ask | Default landscape 1920×1080; portrait 1080×1920 |
 
-Also offer the explicit option "hand it to the AI, make it automatic" for users who don't want to prepare a style reference. Typography is **not** asked about — that is your call in stage 4, and if the right font is not installed you download it.
+The table above is for your own reference. What reaches the user is the Indonesian block. Typography is **not** asked about — that is your call in stage 4, and if the right font is not installed you download it.
 
 ### Stage 3 — Confirm readiness
 
-- **Everything needed is present:** proceed without further questions. Treat user assets as the primary material.
+- **Everything needed is present:** proceed without further questions. Treat user assets as the primary material. Tell the user in one line: `Semua bahan sudah lengkap. Saya mulai kerjakan.`
 - **Something is missing and unanswered:** ask. Never guess.
-- **The user declines to supply a reference or asks for automatic:** find a reference video on Pinterest that fits the topic (procedure and quality filter in `references/RENDER.md` §4) and state the assumption in one sentence. If every search and download fails, stop and ask: supply a file or URL, or give a short style direction (palette, font, mood). There is no default style — never continue without a style anchor.
+- **The user declines to supply a reference or asks for automatic:** find a reference video on Pinterest that fits the topic (procedure and quality filter in `references/RENDER.md` §4) and state the assumption in one sentence. If every search and download fails, stop and ask:
+
+  ```
+  Saya belum menemukan video acuan yang cocok untuk topik ini.
+
+  Ada dua pilihan:
+  1. Anda kirimkan berkas video atau tautannya
+  2. Anda beri arahan singkat: warna, suasana, dan jenis huruf yang Anda mau
+
+  Saya tidak memakai gaya bawaan, karena hasilnya akan terasa generik.
+  ```
 - **An important file will not open or is corrupt:** tell the user. Never pretend it was processed.
+
+  ```
+  Berkas [nama] tidak bisa saya buka. Kemungkinan rusak atau formatnya
+  tidak didukung. Bisa kirim ulang, atau saya lanjut tanpa berkas itu?
+  ```
 
 When the user supplies images, build every visual from those images and adapt them to the voiceover. Never substitute generic stock. Without images, draw your own graphic elements in code (shapes, icons, vector illustration, typography, diagrams). Be honest that these are code-drawn graphics, not photographs or photorealistic AI images.
 
-**Without a voiceover.** Check `GEMINI_API_KEY` and generate voice through Gemini TTS, choosing a voice that fits the topic (`references/RENDER.md` §3). If the key is absent or fails, do not pretend: ask the user to record the approved script and supply the file. If they still want to continue, offer a silent draft with estimated timing and label it clearly as a draft, not a synced final.
+**Without a voiceover.** Check `GEMINI_API_KEY` and generate voice through Gemini TTS, choosing a voice that fits the topic (`references/RENDER.md` §3). If the key is absent or fails, do not pretend:
+
+```
+Saya belum bisa membuat suara otomatis di lingkungan ini.
+
+Pilihannya:
+1. Anda rekam sendiri naskah di atas, lalu kirim berkasnya
+2. Saya lanjutkan sebagai versi awal tanpa suara, waktu tiap kata masih
+   perkiraan dan hasilnya belum tersinkron
+```
 
 ### Stage 4 — Analyse assets and control duration
 
 1. Inventory every file and understand each asset's role against the script. Measure user image dimensions with PIL: an image far smaller than the output resolution breaks when enlarged — tell the user, or design the composition so it still works (e.g. small element instead of full-bleed).
+
+   ```
+   Gambar [nama] berukuran [W]×[H], sedangkan video [W]×[H]. Kalau dipakai
+   penuh layar, gambarnya akan pecah. Saya pakai sebagai elemen kecil saja,
+   atau Anda kirim versi yang lebih besar?
+   ```
 2. Measure the real voiceover duration with `ffprobe`; never infer it from word count. Sanity-check it against the script estimate (~2.5 words/s); a large gap usually means truncated audio — resolve it before continuing.
-3. Find the speech rhythm (pauses, sentence boundaries, stressed words). **Prefer automatic speech recognition with per-word timestamps** (`faster-whisper`, full recipe in `references/RENDER.md` §3) — real word times from the audio, not from word count. Words-per-second estimates are only for sanity-checking script length, and only when ASR cannot run at all; in that case tell the user that word timing is approximate.
+3. Find the speech rhythm (pauses, sentence boundaries, stressed words). **Prefer automatic speech recognition with per-word timestamps** (`faster-whisper`, full recipe in `references/RENDER.md` §3) — real word times from the audio, not from word count. Words-per-second estimates are only for sanity-checking script length, and only when ASR cannot run at all; in that case tell the user:
+
+   ```
+   Pengenalan suara otomatis tidak tersedia di sini, jadi waktu tiap kata
+   saya perkirakan dari jeda dan panjang kalimat. Sinkronisasinya bisa
+   meleset sekitar sepersepuluh sampai setengah detik pada beberapa kata.
+   ```
 4. With a reference video, extract frames and read its visual language: palette, typography, composition, cut rhythm, transition types, depth. Reference is inspiration only. Never copy shots, text placement, or animation order.
-5. **Choose typography from the topic, not from what happens to be installed.** State the choice and reasoning in one sentence (e.g. "colonial archive topic → heavy condensed serif"). If that font is missing, download it before writing scene code — recipe and verification in `references/RENDER.md` §1. Never start building with a font that merely exists and then bend the design toward it; that order produces generic work.
+
+   Report what you found and what you will take, in Indonesian:
+
+   ```
+   Acuan gaya yang saya pakai: [tautan]
+
+   Yang saya ambil: latar [warna], aksen [warna], [jenis huruf],
+   potongan [cepat/tenang], transisi [jenis].
+   Yang tidak saya tiru: susunan adegan dan penempatan teksnya.
+   ```
+5. **Choose typography from the topic, not from what happens to be installed.** State the choice and reasoning in one sentence. If that font is missing, download it before writing scene code — recipe and verification in `references/RENDER.md` §1. Never start building with a font that merely exists and then bend the design toward it; that order produces generic work.
+
+   ```
+   Tipografi: [nama keluarga huruf] untuk [peran], karena [alasan singkat
+   yang menyangkut topik].
+   ```
 
 Final duration comes from the real audio:
 
@@ -206,8 +287,21 @@ Final duration comes from the real audio:
 
 Examples: voiceover 37.3 s → 39.8 → 40 s (1200 frames). Voiceover 52.6 s → 55.1 → 56 s (1680 frames).
 
-- **Within the cap:** proceed. The computed number is the exact video duration. Fill lead-in and tail with meaningful visuals (title, accent, summary) — never blank, frozen, or black frames. Never stretch the audio.
-- **Over the cap** (`MAX_DUR`, default 60 s — meaning a voiceover longer than roughly `MAX_DUR - 2.5` s): stop before rendering. Never cut words, speed up speech, or compress pauses. Tell the user the overrun and the approximate figure, then ask for a decision: shorten the script, re-record, or approve a longer cap.
+- **Within the cap:** proceed. The computed number is the exact video duration. Fill lead-in and tail with meaningful visuals (title, accent, summary) — never blank, frozen, or black frames. Never stretch the audio. Report it in one line:
+
+  ```
+  Suara [X] detik. Video jadi [Y] detik ([Y×30] bingkai), 30 fps.
+  ```
+- **Over the cap** (`MAX_DUR`, default 60 s — meaning a voiceover longer than roughly `MAX_DUR - 2.5` s): stop before rendering. Never cut words, speed up speech, or compress pauses.
+
+  ```
+  Suaranya [X] detik, jadi videonya sekitar [Y] detik. Batas yang saya pakai
+  [MAX] detik, dan saya tidak memotong kata atau mempercepat suara.
+
+  Pilihannya:
+  1. Naskah dipersingkat, lalu suara dibuat ulang
+  2. Anda setujui batas baru, misalnya [Y] detik
+  ```
 - **User states their own target duration:** use it if the voiceover fits (voice + lead-in + tail ≤ target). A target longer than the default is valid as long as the user named it.
 
 ### Stage 5 — Plan the timeline (internal)
@@ -245,7 +339,43 @@ Check the creative side with your eyes, not a script: open a contact sheet of th
 
 Fix everything you find before handing over. Deliver the MP4 using whatever mechanism the environment offers, or simply state its path. Project files are optional extras; the MP4 is mandatory.
 
-Keep the delivery message short: verification results (duration, frames, resolution, codec), which user assets were used, what was generated automatically, and relevant limitations (synthetic music, approximate timing).
+**Print the delivery message in Indonesian, following this shape:**
+
+```
+Videonya sudah selesai.
+
+Berkas   : [lokasi berkas]
+Durasi   : [Y] detik
+Bingkai  : [Y×30] bingkai, 30 fps
+Ukuran   : [W]×[H] ([tegak/mendatar])
+Format   : MP4, H.264, audio AAC
+Batas    : [60 detik / angka yang Anda setujui]
+
+Pemeriksaan
+- Tidak ada bingkai hitam maupun bingkai beku
+- Semua teks muncul setelah kata yang diucapkan
+- Tidak ada teks bertabrakan atau keluar batas aman
+- Audio terisi penuh, tidak ada bagian sunyi yang tak disengaja
+- Volume puncak [X] dB, tidak pecah
+
+Bahan yang Anda berikan
+- Suara: [nama berkas asli]
+- Musik: [nama berkas asli / saya buat sendiri]
+- Acuan gaya: [tautan atau nama berkas]
+- Gambar: [jumlah] berkas
+
+Yang saya buat otomatis
+- [naskah / suara / musik / elemen grafis — sebutkan yang benar-benar otomatis]
+
+Catatan
+- [musik sintetis, bukan komposisi profesional]
+- [waktu per kata hanya perkiraan, karena pengenalan suara tidak tersedia]
+- [berkas antara sudah dihapus]
+
+Kalau ada yang ingin diubah, sebutkan bagiannya dan saya buat ulang.
+```
+
+Omit any line that does not apply. Never leave a section empty just to fill the shape — a shorter honest message beats a padded one. Every number in it must come from measuring the exported file, never from memory or estimate.
 
 ## Honesty about the result
 
