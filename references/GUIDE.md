@@ -213,7 +213,7 @@ Motion must feel like a response to the voice, not random spinning. Visual effec
 
 Text without a supporting word in the voiceover remains legitimate (silent emphasis) — record the reason in the timeline; do not delete it merely because the sync gate cannot verify it.
 
-**Captions are a second, separate layer.** Kinetic typography is the design; burned-in captions are the accessibility and retention baseline every short-form platform expects. If the user wants them, they come from the same `work/words.json` (`RENDER.md` §3) and never replace the kinetic type — style them small, low, and steady, in the covering safe zone (`§2`), with at most 3 words per cue. A subtitle file (`output/<slug>.srt`) is free from the same data; offer it whenever the video is going to a platform.
+**Captions are a second, separate layer.** Kinetic typography is the design; burned-in captions are the accessibility and retention baseline every short-form platform expects. If the user wants them, they come from the same `audio/words.json` (`RENDER.md` §3) and never replace the kinetic type — style them small, low, and steady, in the covering safe zone (`§2`), with at most 3 words per cue. A subtitle file (`output/<slug>.srt`) and the upload copy (`output/publish.txt`) are free from the same data; offer them whenever the video is going to a platform.
 
 ## 8. Music and audio mixing
 

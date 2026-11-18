@@ -152,22 +152,25 @@ tiga-mitos-otak/
 ├── render.py               scenes, timing table, render(t)
 ├── audio/
 │   ├── voiceover.wav       timing source, 48 kHz mono
-│   └── music.wav           optional, 48 kHz
+│   ├── music.wav           optional, 48 kHz
+│   └── words.json          word-level timing; DURABLE, never deleted
 ├── assets/                 optional; created only when the user supplies assets
 │   ├── image-01.png        first supporting image
 │   ├── image-02.png        second supporting image
 │   └── reference.mp4       style reference video
 ├── output/
 │   ├── tiga-mitos-otak.mp4 deliverable; name equals folder name
-│   └── tiga-mitos-otak.srt subtitle track, optional
+│   ├── tiga-mitos-otak.srt subtitle track, optional
+│   └── publish.txt         caption, description, hashtags for upload
 └── work/                   every intermediate file; safe to delete entirely
     ├── frames/
     ├── check/
     ├── voiceover-16k.wav   16 kHz mono, for speech recognition
     ├── voiceover-norm.wav  loudness-normalised voiceover
-    ├── music-norm.wav      looped + ducked-ready music
-    └── words.json          word-level timing; every later stage reads it
+    └── music-norm.wav      looped + ducked-ready music
 ```
+
+`audio/words.json` sits outside `work/` deliberately: it is the only derived file a revision cannot faithfully recreate (a fresh ASR pass returns ~±0.1 s different timestamps and desyncs a re-render). Everything else in `work/` rebuilds in one command, so `rm -rf work` loses nothing that matters.
 
 `render.py` is the Python pipeline's name; the build script is always a single entry point, `render.<ext>`.
 **Naming rule:** file and directory names are English kebab-case; file contents and every message to the user are Indonesian. The project folder and the video carry the topic slug so they stay meaningful in a file manager.

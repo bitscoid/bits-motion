@@ -107,22 +107,25 @@ tiga-mitos-otak/
 ├── render.py               scenes, timing table, render(t)
 ├── audio/
 │   ├── voiceover.wav       timing source, 48 kHz mono
-│   └── music.wav           optional, 48 kHz
+│   ├── music.wav           optional, 48 kHz
+│   └── words.json          word-level timing; DURABLE, never deleted
 ├── assets/                 optional; created only when the user supplies assets
 │   ├── image-01.png        first supporting image
 │   ├── image-02.png        second supporting image
 │   └── reference.mp4       style reference video
 ├── output/
 │   ├── tiga-mitos-otak.mp4 deliverable; name equals folder name
-│   └── tiga-mitos-otak.srt subtitle track, optional
+│   ├── tiga-mitos-otak.srt subtitle track, optional
+│   └── publish.txt         caption + description + hashtags, copy-paste ready
 └── work/                   every intermediate file; safe to delete entirely
     ├── frames/
     ├── check/
     ├── voiceover-16k.wav   16 kHz mono, for speech recognition
     ├── voiceover-norm.wav  loudness-normalised voiceover
-    ├── words.json          word-level timing; every later stage reads it
     └── music-norm.wav      looped + ducked-ready music (when music exists)
 ```
+
+**`audio/words.json` is outside `work/` on purpose.** It is the only derived file a revision cannot cheaply recreate: re-running ASR after a cleanup returns timestamps that differ by ~±0.1 s from the ones the pictures were synced to, so a re-render would drift. Keeping it in `audio/` makes `rm -rf work` lose nothing that matters, and `render.<ext>` reads it from there. Everything else in `work/` is either an input (`audio/`, `assets/`) or rebuildable in one command.
 
 `render.py` is the Python pipeline's name. The build script is always one entry point, `render.<ext>` — `render.mjs` for Remotion, `render.ts` for a Node/Playwright project. Never two.
 
@@ -133,7 +136,7 @@ Never create empty directories. No images means no `assets/`. No music means no 
 | Layer | Form | Example |
 |---|---|---|
 | Directories | one lowercase English word | `audio`, `assets`, `output`, `work`, `frames`, `check` |
-| Data files | English kebab-case | `script.txt`, `voiceover.wav`, `words.json`, `voiceover-norm.wav` |
+| Data files | English kebab-case | `script.txt`, `voiceover.wav`, `words.json`, `publish.txt` |
 | Build script | snake_case + extension of the pipeline | `render.py`, `render.mjs`, `make_music.py` |
 | Project folder | topic slug, kebab-case | `tiga-mitos-otak` |
 | Deliverable | topic slug | `output/tiga-mitos-otak.mp4` |
@@ -164,13 +167,13 @@ If two candidates could both be the voiceover, or a file's role stays unclear af
 
 ### What this workflow does not create
 
-`project.json`, `timing.json`, `scenes.py`, `manifest.json`, `style.json`, `review/`, or a separate QC report. Creative decisions (font, voice, palette) are agreed with the user and live in `render.<ext>`; check results are reported directly in the delivery message. One exception, because it is data and not a report: `work/words.json` (word timings) and the optional `output/<slug>.srt`.
+`project.json`, `timing.json`, `scenes.py`, `manifest.json`, `style.json`, `review/`, or a separate QC report. Creative decisions (font, voice, palette) are agreed with the user and live in `render.<ext>`; check results are reported directly in the delivery message. Three exceptions, because they are data and not reports: `audio/words.json` (word timings), the optional `output/<slug>.srt`, and `output/publish.txt` (platform upload copy).
 
 ### Starting behaviour
 
 - Work in a **subfolder named after the slug**, never in the working directory itself. Everything lives inside it, so two topics never collide.
 - Decide the title in stage 1 alongside the script, and tell the user the slug before writing any file.
-- `work/` can be created at any point. User inputs stay in `audio/` and `assets/`, so `rm -rf work` followed by a re-render restores the full video.
+- `work/` can be created at any point, and `rm -rf work` costs only rebuildable seconds: user inputs stay in `audio/` and `assets/`, and the one non-reproducible derived file — `audio/words.json` — lives in `audio/` beside its source. Re-render restores the full video with identical timing.
 
 ## Workflow
 
@@ -334,7 +337,7 @@ Pilihannya:
    meleset sekitar sepersepuluh sampai setengah detik pada beberapa kata.
    ```
 
-   Write the result to `work/words.json` either way (`references/RENDER.md` §3). Every later stage reads that file: the timeline, the sync gate, and the optional subtitle track.
+   Write the result to `audio/words.json` either way (`references/RENDER.md` §3) — not `work/`, because it is the one derived file a later revision cannot faithfully recreate. Every later stage reads it: the timeline, the sync gate, and the optional subtitle and publish files.
 4. With a reference video, extract frames and read its visual language: palette, typography, composition, cut rhythm, transition types, depth. Reading those frames is an image call — see *Vision routing*, and batch all frames into one delegated call if the main model cannot see them. Measure the cut rhythm (`references/RENDER.md` §4) instead of describing it from impression. Reference is inspiration only. Never copy shots, text placement, or animation order.
 
    Report what you found and what you will take, in Indonesian:
@@ -420,6 +423,7 @@ Inspect the exported MP4 from start to finish, not just the timeline editor:
 6. No black frames, frozen frames, glitches, or unintended audio defects.
 7. The MP4 plays. Actual duration equals the stage-4 total (never over the active cap), frame count = duration × 30, 30 fps, codec and resolution per spec, nothing after the final second, and the cap in use is stated (60 s portrait, 300 s landscape, or the number the user approved). All of it proven from the exported file's metadata.
 8. Gates in `references/RENDER.md` §7 pass: sync (no text appears before its word), geometry (safe area, size legibility, collision, contrast), audio (no dead air inside the speech region; music present in the tail when music exists; mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP), and repetition pattern (flag only, your call). Prove it with numbers and state them in the delivery message.
+9. `output/publish.txt` exists and every block in it is copy-paste ready — see *Publish copy* below. It is part of the deliverable, not an extra.
 
 Check the creative side with your eyes, not a script: open a contact sheet of the export. If the main model cannot see it, hand the sheet to the `vision` subagent — one call, *Vision routing*:
 
@@ -440,7 +444,36 @@ ffmpeg -i output/<slug>.mp4 -vf "fps=1/3,scale=240:-1,tile=${SCALE}x${SCALE}" -f
 
 For a 60 s portrait video the same `fps=1/3` gives 20 cells in a 5×5 grid; for 300 s, 100 cells in 10×10. If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
 
-Fix everything you find before handing over. Deliver the MP4 using whatever mechanism the environment offers, or simply state its path. Project files are optional extras; the MP4 is mandatory.
+### Publish copy — `output/publish.txt`
+
+Every delivery writes this file. The user should never have to write a caption by hand after watching the video, so the file is copy-paste ready with **no markdown headings inside the copies**, no quotes around them, and no placeholder left in.
+
+Rules:
+- **Derived from the finished script, never invented.** Every claim in the copy must already be said or shown in the video. No new numbers, no new promises, no clickbait the video does not deliver.
+- **One section per platform, in plain text**, separated by a blank line and a single `===` line so the user can see where each copy starts. Inside a section there is exactly one paragraph block: the caption.
+- **Caption budget**: first line is the hook and must survive truncation (~90 characters for Reels/TikTok, ~100 for Shorts before "more"). Total caption 150–300 characters per platform short-form; longer only for a landscape explainer, where 300–600 is fine.
+- **Hashtags**: 8–15 on TikTok and Reels, 3–5 on Shorts (YouTube ignores most of them and caps tags at 500 characters total). Mix one broad, two topical, one niche. No hashtag on a line of its own — append after the caption text, since a trailing hashtag wall reads like spam on Reels.
+- **Language follows the video's narration language.** Indonesian narration → Indonesian captions and Indonesian hashtags (`#investasisaham`, not `#stockmarket`).
+- **Never include**: emoji walls, "link in bio" when there is no link, invented statistics, or the word "viral".
+- **Optional blocks** are allowed and must be labelled plainly: a `Judul / Title` line (the platform title field, ≤100 chars), and for YouTube a `Deskripsi` block with 2–3 short lines plus a disclaimer line when the topic is financial, medical, or legal advice. A finance video without "bukan saran investasi" is a defect, not a nicety.
+
+Shape:
+
+```
+=== TikTok
+<caption text> <hashtags on the same flowing block>
+
+=== Instagram Reels
+<caption text> <hashtags>
+
+=== YouTube Shorts
+Judul: <title, <=100 chars>
+<caption text> <3-5 hashtags>
+```
+
+Finished videos for a landscape explainer add a `=== YouTube` section with `Judul`, `Deskripsi`, and the tag list. Never write a block for a platform the user did not ask about and that the video's orientation rules out.
+
+Fix everything you find before handing over. Deliver the MP4 using whatever mechanism the environment offers, or simply state its path. Project files are optional extras; the MP4 and `publish.txt` are mandatory.
 
 **Print the delivery message in Indonesian, following this shape:**
 
@@ -453,6 +486,7 @@ Bingkai  : [Y×30] bingkai, 30 fps
 Ukuran   : [W]×[H] ([tegak/mendatar])
 Format   : MP4, H.264 (high), audio AAC stereo
 Batas    : [60 detik (tegak) / 300 detik (mendatar) / angka yang Anda setujui]
+Caption  : [lokasi publish.txt]
 
 Pemeriksaan
 - Tidak ada bingkai hitam maupun bingkai beku

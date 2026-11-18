@@ -187,7 +187,7 @@ a = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float3
 
 Take ASR output as-is even when the transcription is wrong (e.g. "berumasuk") — you need the word boundaries, not the spelling. ASR error of ±0.1 s is invisible; word-count estimation can be off by 2 s, which is glaring.
 
-Write the result to `work/words.json` — it is the one artefact every later stage reads (timeline, sync gate, and the optional subtitle export):
+Write the result to `audio/words.json` — it is the one artefact every later stage reads (timeline, sync gate, optional subtitle and publish copy), and the one derived file that must survive cleanup:
 
 ```python
 import json
@@ -196,8 +196,10 @@ json.dump({
     "segments": [{"start": s.start, "end": s.end, "text": s.text,
                   "words": [{"word": w.word, "start": w.start, "end": w.end}
                             for w in s.words]} for s in segs]
-}, open("work/words.json", "w"), ensure_ascii=False, indent=1)
+}, open("audio/words.json", "w"), ensure_ascii=False, indent=1)
 ```
+
+`audio/`, not `work/`. Re-running ASR after a cleanup produces timestamps that differ by ~±0.1 s from the ones the pictures were synced to, so a rewrite of this file silently desyncs a re-render. Sitting beside `voiceover.wav` makes it a durable project input rather than a disposable intermediate.
 
 Same file also produces a subtitle track for the platform upload, for free:
 
@@ -209,7 +211,7 @@ def ts(t):
     s, ms = divmod(ms, 1000)
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
-d = json.load(open("work/words.json"))
+d = json.load(open("audio/words.json"))
 off = d["vo_delay"]                            # read the delay, never re-type it
 # one cue per sentence, shifted onto the video timeline
 open("output/<slug>.srt", "w").write("".join(
@@ -789,4 +791,33 @@ Use at most a few per video, always below the voiceover level, and tell the user
 
 ## 10. Cleanup after delivery
 
-`work/` holds every intermediate file: `frames/`, `ref/`, `check/`, normalised audio, and timing JSON. It can reach hundreds of megabytes and the user does not need it. Once the video is verified and delivered, delete the whole `work/`; keep only `script.txt`, `render.<ext>`, `audio/`, `assets/`, and `output/` (plus `output/<slug>.srt` when you generated subtitles). Mention in the delivery message that intermediates were cleaned up.
+`work/` holds every intermediate file: `frames/`, `ref/`, `check/`, `voiceover-16k.wav`, `voiceover-norm.wav`, `music-norm.wav`, TTS payloads. It can reach hundreds of megabytes and the user does not need it. Once the video is verified and delivered, delete the whole `work/`.
+
+**Keep — everything a later revision needs:**
+
+| Path | Why it must survive |
+|---|---|
+| `script.txt` | the narration source; re-generating TTS or re-cutting the script starts here |
+| `render.<ext>` | the whole visual design lives in this one file |
+| `audio/voiceover.wav` | timing source; re-running ASR or re-mixing needs it |
+| `audio/words.json` | **the only non-reproducible derived file** — re-running ASR returns ±0.1 s different timestamps and desyncs a re-render |
+| `audio/music.wav` | re-mix without regenerating music |
+| `assets/` | user-supplied images and the style reference |
+| `output/<slug>.mp4` | the deliverable |
+| `output/<slug>.srt` | subtitle track, when generated |
+| `output/publish.txt` | caption, description, hashtags for upload |
+
+Before deleting, confirm the gates passed — duration, frame count, loudness, black/freeze/tail — measured from the exported MP4, never from the timeline.
+
+**Verify the kept set is self-sufficient, not just present.** One command proves a revision is possible after cleanup:
+
+```bash
+# every input the build script reads must still exist
+grep -oE '(audio|assets|output)/[A-Za-z0-9_.-]+' render.<ext> | sort -u | while read p; do
+  [ -e "$p" ] || echo "MISSING for re-render: $p"
+done
+```
+
+An empty result means `rm -rf work` cost nothing that matters: frames rebuild in one command, and `voiceover-norm.wav` / `music-norm.wav` are two ffmpeg lines that reproduce bit-comparable output from unchanged inputs.
+
+Mention in the delivery message that intermediates were cleaned up, and that the video can be re-rendered from the kept files without re-recording anything.
