@@ -349,7 +349,15 @@ Download candidates one at a time until one works:
 yt-dlp "<pin-url>" -o "assets/reference.mp4"
 ```
 
-Filter before use — check with `ffprobe` and discard candidates that: run under 5 s or over 90 s, sit below the planned output resolution, have no video stream, or are visually unusable. Discarded → try the next.
+Filter before use — check with `ffprobe` and discard candidates that: run under 5 s or over 90 s, have the wrong aspect ratio, have no video stream, or are visually unusable. Discarded → try the next.
+
+**Aspect ratio, not resolution.** A reference teaches style — palette, typography, composition, cut rhythm — and every one of those reads perfectly from a smaller frame. 720×1280 is a valid reference for a 1080×1920 build, and 1280×720 for a 1920×1080 build: same orientation, same 9:16 (or 16:9) geometry. What matters when comparing:
+
+- **orientation** must match the planned output (portrait ref → portrait build; landscape ref → landscape build);
+- **aspect ratio** within a small tolerance (±2% on the ratio; 720×1280, 1080×1920, 2160×3840 are all exactly 9:16 — a 9:16 crop of a 1:1 or 16:9 clip is *not* the same geometry and misleads composition analysis);
+- **resolution is irrelevant** for a reference (it is analysed at reduced scale anyway — contact sheets are drawn at 240–480 px wide), and never a reason to reject.
+
+A 1:1 square reference can still serve as a *mood* anchor (palette, typography register) when nothing else exists, but never as a composition/rhythm anchor — note that limitation in one line when you use it.
 
 **When the user supplies the Pinterest URL themselves**, skip the search entirely: that URL is the reference. Download it with the same command. If it fails (region block, removed pin, no video stream), say so once, then fall back to the search order above — never silently drop the style anchor.
 

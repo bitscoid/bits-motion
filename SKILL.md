@@ -272,14 +272,14 @@ The table above is for your own reference. What reaches the user is the Indonesi
   yt-dlp "<pinterest-url>" -o "assets/reference.mp4"
   ```
 
-  Then probe it. If it fails (region block, removed pin, no video stream, under 5 s, or under the planned resolution), say so once and fall back to the search path below — never silently drop the style anchor.
+  Then probe it. If it fails (region block, removed pin, no video stream, under 5 s, or wrong aspect ratio), say so once and fall back to the search path below — never silently drop the style anchor.
 - **The user declines to supply a reference, or asks for everything automatic:** searching Pinterest yourself is **mandatory before self-design** — never jump straight to designing your own style. The search path failed in a measured run (2026-11) only after 8 candidates; that is the budget to beat. Work in this order:
 
   1. **Search.** Use the Pinterest search URL directly or a web search, keywords = `motion graphics` + the topic's own words:
      - `https://id.pinterest.com/search/pins/?rs=typed&q=motion+graphics+<topik>` (or `pinterest.com pin <topic keywords> motion graphics video` through a web search)
      - try Indonesian AND English keywords; collect 5+ candidate pin URLs before downloading anything.
   2. **Download one at a time** until one passes the filter: `yt-dlp "<pin-url>" -o "assets/reference.mp4"`.
-  3. **Filter with `ffprobe`** and discard: under 5 s, over 90 s, below planned resolution, no video stream. Discarded → next candidate.
+  3. **Filter with `ffprobe`** and discard: under 5 s, over 90 s, wrong aspect ratio (a reference only needs to *match the orientation*, not the output resolution — a 720×1280 pin is a perfectly good style anchor for a 1080×1920 video; see `references/RENDER.md` §4), no video stream. Discarded → next candidate.
   4. **Measured failure modes (do not read them as "Pinterest is down"):**
      - many pins are images with a video thumbnail → yt-dlp exits `No video formats found!` → skip, next pin;
      - pins that embed Vimeo can fail with `Unable to extract info section` or an SSL `Hostname mismatch` for `vimeo.com` — some environments TLS-block Vimeo; try the direct `vimeo.com/<id>` URL once, then skip the whole domain;
