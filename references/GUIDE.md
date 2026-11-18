@@ -27,7 +27,11 @@ Tipografi adalah elemen bercerita, bukan sekadar subtitle.
 Teknik yang bisa dipakai sesuai konteks: teks muncul bersamaan dengan kata yang diucapkan, reveal dengan mask, animasi kata atau huruf bertahap, skala dengan overshoot terkontrol, animasi spasi antar huruf, teks masuk dari balik objek, clipping dan layering kreatif, penekanan lewat ketebalan, warna, atau ukuran.
 
 Aturan:
-- Pilih font modern, tebal, dan sangat terbaca. Pakai font asli lewat kode (bukan teks hasil generate gambar), sehingga huruf tidak pernah rusak atau jadi kata palsu. Daftar font terpasang + pemetaan mood (modern/playful-doodle/handwriting/impact) ada di `references/RENDER.md` §"Font siap pakai" — cocokkan dengan mood referensi, maksimal 2–3 family per video, dan cek dulu dengan `fc-list` sebelum dipakai di scene.
+- Pilih font modern, tebal, dan sangat terbaca. Pakai font asli lewat kode (bukan teks hasil generate gambar), sehingga huruf tidak pernah rusak atau jadi kata palsu.
+
+  **Font bukan menu tetap.** Katalog di `RENDER.md` §"Font siap pakai" adalah contoh yang sudah terpasang, bukan daftar pilihan yang boleh dipakai. Tugasmu: pilih tipografi yang **cocok dengan topik dan mood referensi**, bukan yang paling atas di tabel. Kalau topik butuh sesuatu yang belum ada (mis. topik kuliner butuh slab serif gemuk, topik arsip butuh condensed tebal, topik teknologi butuh grotesk sempit), **unduh sendiri** — jangan turun ke font yang "cukup mirip" hanya karena sudah terpasang. Resep unduh + verifikasi ada di `RENDER.md` §1 "Menambah font baru".
+
+  Batasnya bukan jenis font, tapi jumlah: maksimal 2–3 family per video supaya tetap satu keluarga. Cek dengan `fc-list` atau `fc-query` sebelum dipakai di scene.
 - Pertahankan ejaan dan makna teks persis seperti naskah.
 - Pecah teks jadi frasa pendek. Jangan menampilkan satu paragraf utuh sekaligus. Sorot hanya kata kunci.
 - Pisahkan jelas tingkatan: judul, kata kunci, teks pendukung, label kecil.
@@ -38,7 +42,13 @@ Aturan:
   - **teks pendukung / label / chip kecil**: tinggi glyph ≥ 2,5% tinggi frame (1920 → 48 px; font ≈ 64 px), dan wajib lolos kontras 4,5:1 karena ukurannya kecil.
 
   Kalau baris pendukung tidak muat di tingkat 2,5% bersama elemen lain, kurangi jumlah kata di baris itu — jangan turunkan ambangnya.
-- Cek kontras teks vs latarnya di kode, jangan dikira dari nama warna. Ambangnya terukur: rasio kontras minimal **4,5:1** untuk teks kecil dan **3:1** untuk teks besar (≥24 px tebal atau ≥32 px biasa). Hitung dengan rumus WCAG:
+
+  Semua angka di atas (safe area, dua tingkat glyph, kontras) sudah tersedia sebagai fungsi siap pakai di `references/scripts/gates.py`. Pakai pustaka itu, jangan menulis ulang rumusnya di setiap proyek.
+- Cek kontras teks vs latarnya di kode, jangan dikira dari nama warna. Ambangnya terukur dan diikat ke **peran teks**, bukan ukuran piksel:
+  - **teks utama / kata kunci: 3,0:1**
+  - **teks pendukung / label / chip: 4,5:1** — lebih ketat dari WCAG "large text", karena teks kecil yang bergerak cepat terbaca jauh lebih buruk daripada teks diam berukuran sama.
+
+  Hitung dengan rumus WCAG (atau pakai `references/scripts/gates.py`):
 
 ```python
 def lum(c):  # c = (r, g, b) 0-255
@@ -82,7 +92,9 @@ Pemotongan latar (cut-out): kalau tool pemotong latar tidak tersedia, pakai mask
 
 Pilihan: match cut, whip, wipe terarah, reveal dengan mask, transisi bentuk, transisi skala, transisi yang digerakkan tipografi, transisi parallax berlapis, transisi motion blur, dan elemen grafis yang berpindah antar scene.
 
-Ini pilihan, bukan daftar centang. Pilih yang cocok dengan isi dan jaga kesatuan gaya. Sebisa mungkin hubungkan elemen visual antar scene supaya tidak terasa terputus. Patokan ritme kasar: scene inti ±2–6 detik, tidak ada scene di bawah 1 detik di sepertiga akhir (penonton butuh waktu mencerna), variasi terbesar ditaruh di pembuka.
+Ini pilihan, bukan daftar centang. Pilih yang cocok dengan isi dan jaga kesatuan gaya. Sebisa mungkin hubungkan elemen visual antar scene supaya tidak terasa terputus.
+
+Ritme ditentukan isi, bukan angka. Patokan "scene inti ±2–6 detik" hanya deskripsi video pendek pada umumnya — kalau sebuah ide butuh 8 detik untuk mendarat, beri 8 detik. Yang tetap dijaga: variasi terbesar ditaruh di pembuka, dan scene di sepertiga akhir jangan terlalu pendek sampai penonton tidak sempat mencerna.
 
 Hindari glitch berlebihan, putaran acak, kilatan tanpa alasan, dan transisi yang menutupi penjelasan. Semua transisi harus muat di dalam durasi total yang sudah dihitung. Durasi video tidak boleh melar karena transisi.
 

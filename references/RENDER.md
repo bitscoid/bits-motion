@@ -36,6 +36,8 @@ Catatan: jaringan lingkungan kerja bisa dibatasi. Cek dulu apa yang bisa diakses
 
 ### Font siap pakai (terpasang di `~/.local/share/fonts/motion/`)
 
+**Katalog ini titik awal, bukan menu.** Kalau topik butuh tipografi yang tidak ada di sini, unduh sendiri (lihat sub-bagian berikut). Memakai font terpasang hanya karena tersedia adalah cara tercepat membuat semua video terasa sama.
+
 Cek cepat: `fc-list | grep -iE "poppins|fredoka|caveat"` — kalau kosong, font belum terpasang (lihat troubleshooting bagian 6).
 
 Pilih sesuai mood video; satu video maksimal 2–3 family (satu display + satu pendukung, plus handwriting kalau perlu aksen):
@@ -51,6 +53,50 @@ Pilih sesuai mood video; satu video maksimal 2–3 family (satu display + satu p
 | Teknis/data/mono | `JetBrains Mono`, `Space Mono`, `Space Grotesk` | Label kecil, angka statistik, nuansa data/teknologi |
 
 Cara pakai: di CSS/Remotion pakai nama family persis seperti di `fc-list` (mis. `"Baloo 2"`, `"Bebas Neue"`); di PIL pakai path file TTF langsung (`~/.local/share/fonts/motion/Baloo2.ttf`). Font variable (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) punya semua bobot dalam satu file — di CSS set `font-weight`; di PIL instantiate bobot dengan `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins tidak variable: pakai file terpisah `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (tidak ada `Poppins.ttf`).
+
+### Menambah font baru
+
+Kalau topik butuh tipografi yang belum terpasang, unduh sendiri. Tiga jalur, coba berurutan:
+
+```bash
+# 1) Google Fonts lewat repo github/google/fonts — paling andal, file TTF langsung
+#    pola path: <lisensi>/<slug>/<NamaFile>.ttf   (lisensi: ofl | apache | ufl)
+SLUG=outfit; FILE="Outfit%5Bwght%5D.ttf"     # %5B = [ , %5D = ] untuk font variable
+curl -sL -o "/tmp/$SLUG.ttf" "https://github.com/google/fonts/raw/main/ofl/$SLUG/$FILE"
+
+# 2) kalau slug/nama file tidak diketahui, tanya API-nya.
+#    Perhatikan: urutan listing sering menaruh file Italic di depan -- filter dulu,
+#    dan utamakan yang tidak Italic. Nama file bermuatan [ ] harus di-URL-encode
+#    (%5B / %5D) saat diunduh.
+SLUG=outfit
+curl -s "https://api.github.com/repos/google/fonts/contents/ofl/$SLUG" \
+  | python3 -c "
+import json, sys, urllib.parse
+fs = [f['name'] for f in json.load(sys.stdin) if f['name'].endswith('.ttf')]
+plain = [f for f in fs if 'italic' not in f.lower()] or fs
+pick = plain[0]
+print('pilih:', pick)
+print('unduh:', 'https://github.com/google/fonts/raw/main/ofl/$SLUG/' + urllib.parse.quote(pick))
+"
+
+# 3) kalau GitHub diblokir: npm @fontsource (kemasannya berisi file woff2 + ttf)
+npm pack "@fontsource/$SLUG" --silent && tar -xzf fontsource-$SLUG-*.tgz && \
+  find package -name "*.ttf" | head
+```
+
+Setelah dapat file, **wajib verifikasi sebelum dipakai di scene** — font rusak atau bukan file font akan gagal jauh di tengah render:
+
+```python
+from PIL import ImageFont
+f = ImageFont.truetype("/tmp/outfit.ttf", 80)
+print(f.getname())                       # nama family sebenarnya, bukan nama file
+d.textbbox((0, 0), "Baca Tulis", font=f)  # harus mengembalikan kotak, bukan error
+f.set_variation_by_axes([700])           # hanya kalau variable font
+```
+
+Kalau file berukuran < 10 KB, itu halaman HTML error, bukan font. Salin ke `~/.local/share/fonts/motion/` dengan nama sesuai family (mis. `Outfit.ttf`), lalu `fc-cache -f` bila memakai nama family di CSS. Untuk PIL, path langsung cukup — tidak perlu fc-cache.
+
+Catatan penting: pilih font yang **layak untuk topiknya**, bukan yang paling mudah diunduh. Kalau unduhan gagal semua, pakai yang terpasang dan katakan ke user bahwa tipografi idealnya belum tercapai — jangan diam-diam turun ke font default yang jelek (lihat §9).
 
 ## 2. Memilih pipeline render
 
@@ -222,8 +268,13 @@ Kualitas hasil cari sendiri tidak terkontrol. Wajib: sebut ke user video referen
 
 - Tulis satu fungsi `render(t)` yang menggambar seluruh frame dari waktu saja, tanpa state tersembunyi atau angka acak yang berubah tiap panggilan (pakai seed tetap).
 - Definisikan fungsi easing (ease-out, ease-in-out, overshoot) dan pakai di semua animasi. Hindari gerak linear kecuali memang disengaja.
-- **Kewajiban gerak (gerbang QC, bukan pilihan):** di SETIAP detik video ada minimal satu elemen yang bergerak. Tidak boleh ada slide statis. Jika scene "diam", pakai kamera mikro: zoom drift ±2–4% atau geser ±10–20 px sepanjang scene. Kata kunci dan angka penting (mis. "92 juta") wajib pop skala (±15–25% + warna aksen) tepat saat kata diucapkan, dan skala WAJIB decay kembali ke 100% sebelum pop berikutnya — nilai overshoot yang menetap (mis. kata terus memakai skala 120%) membuat kata menimpa tetangganya. Slot lebar tiap kata diukur dengan font yang benar-benar dipakai (keyword ≠ body), dan kata yang muncul dua kali dalam satu scene punya waktu masing-masing — jangan dipetakan lewat dict per kata. Catatan desain idle motion: gerak POSISI elemen (geser x/y), bukan cuma perubahan radius/skala — lingkaran solid tanpa antialias yang hanya berdenyut radius sering tidak mengubah satu piksel pun; dan ukurannya minimal radius ±14 px / amplitudo ±10 px, kalau lebih kecil encoder (CRF 18+) bisa meng-quantize gerakan itu sampai hilang (lihat §9).
-- Rumus easing siap pakai: `easeOutCubic(u) = 1-(1-u)**3`; `easeInOutCubic(u) = u<0.5 ? 4*u**3 : 1-((-2*u+2)**3)/2`; overshoot: `1 + 2.7*(u-1)**3 + 1.7*(u-1)**2` (back-out, gunakan untuk pop masuk). Durasi animasi masuk elemen 0,3–0,6 dtk, transisi antar scene 0,3–0,5 dtk.
+- **Kewajiban gerak (gerbang QC, bukan pilihan):** di SETIAP detik video ada minimal satu elemen yang bergerak. Tidak boleh ada slide statis. Jika scene "diam", pakai kamera mikro: zoom drift ±2–4% atau geser ±10–20 px sepanjang scene. Kata kunci dan angka penting (mis. "92 juta") wajib diberi penekanan gerak tepat saat kata diucapkan — besar dan bentuk penekanannya keputusan rasa (pop skala, warna, bobot, posisi, atau kombinasi), dan skala WAJIB decay kembali ke 100% sebelum pop berikutnya — nilai overshoot yang menetap (mis. kata terus memakai skala 120%) membuat kata menimpa tetangganya. Slot lebar tiap kata diukur dengan font yang benar-benar dipakai (keyword ≠ body), dan kata yang muncul dua kali dalam satu scene punya waktu masing-masing — jangan dipetakan lewat dict per kata. Catatan desain idle motion: gerak POSISI elemen (geser x/y), bukan cuma perubahan radius/skala — lingkaran solid tanpa antialias yang hanya berdenyut radius sering tidak mengubah satu piksel pun; dan ukurannya minimal radius ±14 px / amplitudo ±10 px, kalau lebih kecil encoder (CRF 18+) bisa meng-quantize gerakan itu sampai hilang (lihat §9).
+- Rumus easing siap pakai (boleh dipakai, boleh diganti rumus lain sesuai rasa): `easeOutCubic(u) = 1-(1-u)**3`; `easeInOutCubic(u) = u<0.5 ? 4*u**3 : 1-((-2*u+2)**3)/2`; overshoot/back-out: `1 + 2.7*(u-1)**3 + 1.7*(u-1)**2`.
+
+  **Tidak ada angka durasi atau overshoot yang diwajibkan.** Durasi masuk, besar overshoot, dan ritme adalah keputusan rasa — pilih yang cocok dengan tempo narasi dan mood referensi. Yang wajib hanyalah invarian berikut, karena kalau dilanggar hasilnya rusak, bukan cuma berbeda rasa:
+  - skala pop **decay balik ke 100%** sebelum pop berikutnya (kalau tidak, kata menimpa tetangganya);
+  - hindari kecepatan konstan kecuali memang disengaja;
+  - elemen idle bergerak **posisi**, bukan cuma radius/skala (lihat catatan encoder di atas).
 - Ikon dan diagram digambar dari bentuk kode (donut, bar, briefcase, bohlam) — bukan teks atau emoji. Latar boleh bergantian antar scene (mis. terang/gelap) dengan satu warna aksen konsisten.
 - Motion blur bisa disimulasikan dengan merata-ratakan beberapa sub-frame pada waktu yang sedikit berbeda.
 - Render paralel dan bisa resume: karena frame deterministik, gambar dengan beberapa worker (mis. `multiprocessing`, 4–8 proses) dan lewati frame yang file PNG-nya sudah ada dan tidak kosong. Kalau render mati di tengah, jalankan ulang skrip yang sama — hanya frame yang hilang yang digambar ulang.
@@ -319,7 +370,24 @@ Kalau musik tetap ingin punya fade-out, buat fade di file musiknya sendiri dan p
 
 ### Dua gerbang tambahan: sinkron dan geometri
 
-Keduanya skrip, jalan di atas frame hasil render, dan menangkap kelas cacat yang tidak terlihat saat menonton sekali jalan. Snippet di bawah memakai API contoh (objek `Cam`, fungsi `render_frame`); **prinsipnya yang diikuti, bukan namanya** — sesuaikan dengan pipeline yang dipakai (`RENDER.md` §2). Yang wajib ada di pipeline mana pun:
+Keduanya skrip, jalan di atas frame hasil render, dan menangkap kelas cacat yang tidak terlihat saat menonton sekali jalan.
+
+**Pakai pustaka siap pakai.** Safe area, dua tingkat tinggi glyph, tabrakan teks, kontras, dan pola berulang sudah ada di `references/scripts/gates.py`. Fungsi di sana mengembalikan daftar saran (string), bukan keputusan lulus/gagal — jadi tidak ada yang dipaksa seragam. Panggil dari skrip render proyek:
+
+```python
+import sys; sys.path.insert(0, "…/bits-motion/references/scripts")
+from gates import safe_area, glyph_size, overlaps, contrast, repeated_pattern, report
+
+temuan = {"safe_area": [], "glyph": [], "overlap": [], "kontras": []}
+for t in teks_yang_digambar:          # dikumpulkan saat render
+    temuan["safe_area"] += safe_area(t.bbox, W, H, label=t.s)
+    temuan["glyph"]     += glyph_size(t.bbox, H, main=t.main, label=t.s)
+    temuan["kontras"]   += contrast(t.fill, t.bg, main=t.main, label=t.s)
+temuan["overlap"] = overlaps([(t.bbox, t.s) for t in teks_yang_digambar])
+print(report(temuan))
+```
+
+Snippet di bawah menunjukkan **prinsipnya** (memakai API contoh `Cam`); kalau pipeline-mu beda, padanan cara menangkap teks ada di tabel berikut. Yang wajib ada di pipeline mana pun:
 
 | Pipeline | Cara menangkap teks | Cara mengambil frame |
 |---|---|---|
@@ -381,7 +449,42 @@ assert ratio(fill, bg_color) >= (3.0 if size >= 32 else 4.5), f"kontras kurang: 
 
 **Gerbang kontras** memakai rumus WCAG yang sama dengan `GUIDE.md` §2. Terukur pada palet yang sering dipakai: pasangan tinta-di-krem dan krem-di-gelap lolos jauh di atas 4,5:1, tapi aksen salmon muda di atas krem hanya **1,85:1** — gagal telak untuk teks apa pun. Kalau gerbang ini menolak, jangan turunkan ambangnya: ganti warnanya, atau taruh teks itu di latar gelap, atau beri panel solid di belakang.
 
-Teks yang sama digambar dua kali di posisi sama (mis. teks di atas blok sorot) memang IoU 1,0 — itu disengaja, kecualikan pasangan identik. Jalankan ketiga gerbang sebelum ekspor, bukan setelah; lebih murah render ulang satu scene daripada satu video.
+### Gerbang ketiga: pola berulang (menandai, tidak menolak)
+
+Gerbang ini **tidak menghakimi**. Ia hanya menunjukkan scene yang strukturnya sama, lalu kamu yang memutuskan.
+
+```python
+# untuk setiap scene, ambil sidik struktur (bukan isi):
+#   posisi_massa : di mana pusat tinta berada  (kiri/tengah/kanan, atas/tengah/bawah)
+#   kepadatan    : rasio piksel bertinta
+#   latar        : terang / gelap
+def signature(frame_rgb):
+    g = np.array(frame_rgb.convert("L"))
+    ink = g < 110
+    if ink.sum() < 500:
+        return ("kosong",)
+    ys, xs = np.nonzero(ink)
+    return (
+        round(xs.mean() / g.shape[1], 1),   # 0.0 kiri .. 1.0 kanan
+        round(ys.mean() / g.shape[0], 1),
+        round(ink.mean(), 2),
+        "gelap" if g.mean() < 100 else "terang",
+    )
+
+sigs = [signature(f) for f in frames_tengah_tiap_scene]
+for i in range(1, len(sigs)):
+    if sigs[i] == sigs[i - 1]:
+        print(f"scene {i} dan {i+1} berpola sama: {sigs[i]}")
+```
+
+Kalau dua scene berurutan berpola sama, **jangan otomatis diubah**. Tulis satu kalimat di timeline:
+
+- "motif sengaja diulang — dua scene ini memang sepasang" → biarkan
+- "kebetulan, tidak ada ide lain" → ubah komposisi, kepadatan, atau skala
+
+Pengulangan yang disengaja sering bagus dan itu sah. Yang harus ketahuan adalah pengulangan karena tidak ada keputusan. Gerbang ini memaksa keputusan itu ditulis, bukan menyeragamkan hasil.
+
+Teks yang sama digambar dua kali di posisi sama (mis. teks di atas blok sorot) memang IoU 1,0 — itu disengaja, kecualikan pasangan identik. Jalankan keempat gerbang sebelum ekspor, bukan setelah; lebih murah render ulang satu scene daripada satu video.
 
 Dua hal yang bikin gerbang ini salah kepikiran:
 - `freezedetect` dengan `n=-60dB` (nilai default) FALSE POSITIVE di motion graphic: decoded frame di rentang "freeze" bisa berubah ribuan piksel per frame (elemen idle, dot napas) tapi filter tetap bilang freeze karena ambangnya terlalu tinggi untuk grafis flat. Selalu pakai `n=0`.
