@@ -7,10 +7,10 @@
 No storyboard. No editing advice. A rendered MP4 you can publish.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Format](https://img.shields.io/badge/output-MP4%20H.264%20%2B%20AAC-blue)]()
-[![Frame rate](https://img.shields.io/badge/fps-30%20CFR-informational)]()
-[![Duration](https://img.shields.io/badge/duration-follows%20voiceover-brightgreen)]()
-[![Docs](https://img.shields.io/badge/docs-English%20only-lightgrey)]()
+![Format](https://img.shields.io/badge/output-MP4%20H.264%20%2B%20AAC-blue)
+![Frame rate](https://img.shields.io/badge/fps-30%20CFR-informational)
+![Duration](https://img.shields.io/badge/duration-follows%20voiceover-brightgreen)
+![Docs](https://img.shields.io/badge/docs-English%20only-lightgrey)
 
 </div>
 
@@ -34,14 +34,18 @@ Resolution follows the reference video's orientation. Without a reference it ask
 
 ```bash
 # 1. install into your agent's skill directory
-git clone git@github.com:bitscoid/bits-motion.git \
+git clone https://github.com/bitscoid/bits-motion.git \
   ~/.config/opencode/skills/bits-motion
 
-# 2. ask for a video
+# 2. check the toolchain (ffmpeg, ffprobe, PIL, numpy)
+ffmpeg -version | head -1
+python3 -c "import PIL, numpy; print('PIL+numpy ok')"
+
+# 3. ask for a video
 "buatkan motion graphic tentang kenapa kopi bikin ngantuk"
 ```
 
-That's the whole interface. No config file, no CLI flags, no build step.
+That's the whole interface. No config file, no CLI flags, no build step. The full environment probe — ASR, fonts, network, API key — is `references/RENDER.md` §1.
 
 ---
 
@@ -51,7 +55,7 @@ This skill is **rules, not a template.**
 
 | Layer | Divided how |
 |---|---|
-| 🎯 **Accuracy** | Measurable, must pass — timing follows the spoken word, text stays in the safe area, glyph height meets threshold, contrast meets WCAG, no dead audio tail, frame count is exact |
+| 🎯 **Accuracy** | Measurable, must pass — timing follows the spoken word, text stays in the safe area, glyph height meets threshold, contrast meets WCAG, no dead air inside the narration, mix loudness in band, frame count is exact |
 | 🎨 **Taste** | Entirely yours — palette, scene count, transitions, typeface, mood, motion rhythm |
 
 The test applied to every rule before it entered these documents:
@@ -78,10 +82,10 @@ Word-count estimation is the documented fallback, clearly labelled as approximat
 <details open>
 <summary><b>📐 Typography geometry</b></summary>
 
-- Safe area: **4%** from every edge
-- Glyph height, not font size (capitals ≈ 0.75× the size): **4%** of frame height for primary text, **2.5%** for supporting text
-- Centring is measured from the glyph box, never delegated to `anchor="mm"`
-- Text collision checked by glyph-box IoU (**< 0.16**)
+- Safe area: **4%** from every edge — and for portrait short-form, **10% bottom / 12% right**, because the platform UI covers that band
+- Glyph height, not font size: **4%** of the short side for primary text, **2.5%** for supporting text (1080p landscape → 43 px / 27 px)
+- Centring is measured from the glyph box, never delegated blindly to `anchor="mm"`
+- Text collision checked by **coverage of the smaller box (< 0.02)**, not IoU — IoU 0.16 lets a 20% line overlap pass
 
 </details>
 
@@ -93,25 +97,28 @@ Thresholds are tied to the text's **role**, not its pixel size — small moving 
 - Primary text: **3.0:1**
 - Supporting text: **4.5:1**
 
-Measured while building this skill: a light salmon accent on cream reaches only **1.85:1** — a hard fail that recomputing the palette to `(166, 82, 70)` fixed at **4.56:1**.
+Measured with the WCAG formula: a light salmon `(238,150,130)` on cream `(245,241,234)` reaches only **2.00:1** — a hard fail; darkening the accent to `(166,82,70)` reaches **4.76:1** and passes for supporting text. The docs ship a `fit_accent()` helper that walks lightness until the ratio clears, so the palette is chosen by measurement rather than by eye.
 
 </details>
 
 <details open>
 <summary><b>🔊 Audio</b></summary>
 
-- Voiceover normalised to −16 LUFS, peak −1.5 dB, in its own file
-- Music mixed separately, ducked under speech, faded before the final second
-- Audio tail gate: `silencedetect` must be empty all the way to the last second
+- Voiceover normalised to −16 LUFS, true peak −1.5 dB, in its own file
+- Music **looped to the video length** (`-stream_loop -1`), ducked under speech, faded to a floor — never to absolute zero
+- Audio gate is **windowed**: no dead air inside the speech region, and with music the tail must still carry sound
+- Finished mix measured: **I ∈ [−17, −14] LUFS**, true peak ≤ −1 dBTP
 
-The trap that produced this rule: `loudnorm` placed inline with `apad` in one `filter_complex` dropped the tail to **−91 dB** while the source sat at −15 dB.
+Measured traps that produced these rules: `loudnorm` inline with `apad` drops the tail to **−91 dB**; `afade=t=out` ending on the last frame leaves the final 0.8 s at **−61.7 dB**; a 10 s music bed on a 28 s video without looping leaves **18 s of silence**.
 
 </details>
 
 <details open>
 <summary><b>🎞 Motion</b></summary>
 
-Every second of video keeps at least one element moving. Verified with `freezedetect=n=0` — never the default `n=-60dB`, which false-positives on flat graphics.
+Every second of video keeps at least one element moving. Verified with `freezedetect=n=0` — never the default `n=-60dB`, which false-positives on flat graphics. The 1 s lead-in before speech is exempt.
+
+Frame contiguity is asserted before encoding: a missing PNG mid-sequence silently truncates the MP4 (`%05d` input stops at the gap).
 
 The lower bound is the encoder, not taste: motion under ~10 px can be quantised away at CRF 18+, leaving identical frames.
 
@@ -121,6 +128,8 @@ The lower bound is the encoder, not taste: motion under ~10 px can be quantised 
 <summary><b>🔁 Repetition gate (flags, never judges)</b></summary>
 
 Scenes with the same structural signature get flagged so you can decide: *deliberate motif* or *coincidence to fix*. The gate forces that decision to be written down; it never homogenises the output.
+
+Signatures compare ink against each frame's own modal luma, so a dark theme with light text works — the old `luma < 110` rule measured the background and returned an identical centroid for every scene.
 
 </details>
 
@@ -142,15 +151,18 @@ tiga-mitos-otak/
 │   ├── image-02.png        second supporting image
 │   └── reference.mp4       style reference video
 ├── output/
-│   └── tiga-mitos-otak.mp4 deliverable; name equals folder name
+│   ├── tiga-mitos-otak.mp4 deliverable; name equals folder name
+│   └── tiga-mitos-otak.srt subtitle track, optional
 └── work/                   every intermediate file; safe to delete entirely
     ├── frames/
     ├── check/
     ├── voiceover-16k.wav   16 kHz mono, for speech recognition
     ├── voiceover-norm.wav  loudness-normalised voiceover
-    └── words.json          word-level timing output
+    ├── music-norm.wav      looped + ducked-ready music
+    └── words.json          word-level timing; every later stage reads it
 ```
 
+`render.py` is the Python pipeline's name; the build script is always a single entry point, `render.<ext>`.
 **Naming rule:** file and directory names are English kebab-case; file contents and every message to the user are Indonesian. The project folder and the video carry the topic slug so they stay meaningful in a file manager.
 
 `rm -rf work` then re-render restores the whole video.
@@ -164,7 +176,7 @@ tiga-mitos-otak/
 | `ffmpeg` + `ffprobe` | rendering, measuring, verification |
 | `python3` + PIL + numpy | frame generation and asset measurement |
 | `faster-whisper` | word-level timing (optional, degrades to estimate) |
-| `GEMINI_API_KEY` | optional TTS when you have no recording |
+| `GEMINI_API_KEY` | optional TTS when you have no recording (Interactions endpoint) |
 | `yt-dlp` | optional, downloading style references |
 
 Verified on ffmpeg 7.1. Every ffmpeg behaviour cited in the docs was measured on a real render, not copied from documentation.
@@ -202,6 +214,8 @@ Then verifies it before use — under 10 KB means an HTML error page, not a font
 - Word timing is **approximate** when ASR is unavailable, and the delivery message says so
 - The agent cannot watch the video; visual QC relies on extracted frames, contact sheets, and measured numbers
 - Maximum 60 seconds by default — this is a short-form explainer, not a documentary tool
+- Captions are **offered, not assumed**; burned-in captions are a separate style decision from kinetic typography
+- Loudness of the finished mix is verified, but creative judgements (does the beat land, does the hook grip) stay yours
 
 ---
 

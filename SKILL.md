@@ -21,7 +21,8 @@ Execute every stage in the main session: script, assets, sync, render, QC. Do no
 | Duration cap (`MAX_DUR`) | Default **60 s**, locked. Raise only when the user explicitly asks |
 | Frame rate | 30 fps, constant |
 | Frame count | duration × 30, exact. Example: 43 s = 1290 frames |
-| Format | MP4, H.264 video, AAC audio |
+| Format | MP4, H.264 video (high profile), AAC audio, stereo |
+| Loudness | finished mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP |
 | Resolution | Follow the reference video's orientation. Without a reference, ask; if unanswered use 1920×1080. Portrait = 1080×1920 |
 
 Audio decides length. `MAX_DUR` stays locked unless the user asks for more — if the voiceover overruns it, stop and ask; never silently lengthen the video.
@@ -38,7 +39,7 @@ A new rule belongs here only if it satisfies **both**:
 
 A rule that passes (1) but fails (2) is a restriction, not a standard. Rejected examples: "overshoot must be 1.16", "the hook must be 3 seconds", "scenes must be 2–6 seconds", "the palette must be cream".
 
-- **Required (measurable):** text timing follows the spoken words; text inside a shape is centred by glyph box; no text collides or leaves the safe area; glyph height meets the threshold; contrast meets the threshold; no dead audio tail; frame count is exact.
+- **Required (measurable):** text timing follows the spoken words; text inside a shape is centred by glyph box; no text collides or leaves the safe area; glyph height meets the threshold; contrast meets the threshold; no dead audio inside the speech region; mix loudness inside the stated band; frame count is exact.
 - **Free (your call):** palette, scene count, transition order, **font choice and typeface family**, mood, text placement, cut rhythm, animation duration, overshoot amount, whether an idea needs words at all.
 
 Every number left in these documents **protects** something (legibility, safe area, contrast, encoder behaviour). If you find a number that dictates taste, treat it as a bug in this document: skip it and say so.
@@ -80,14 +81,18 @@ tiga-mitos-otak/
 │   ├── image-02.png        second supporting image
 │   └── reference.mp4       style reference video
 ├── output/
-│   └── tiga-mitos-otak.mp4 deliverable; name equals folder name
+│   ├── tiga-mitos-otak.mp4 deliverable; name equals folder name
+│   └── tiga-mitos-otak.srt subtitle track, optional
 └── work/                   every intermediate file; safe to delete entirely
     ├── frames/
     ├── check/
     ├── voiceover-16k.wav   16 kHz mono, for speech recognition
     ├── voiceover-norm.wav  loudness-normalised voiceover
-    └── words.json          word-level timing output
+    ├── words.json          word-level timing; every later stage reads it
+    └── music-norm.wav      looped + ducked-ready music (when music exists)
 ```
+
+`render.py` is the Python pipeline's name. The build script is always one entry point, `render.<ext>` — `render.mjs` for Remotion, `render.ts` for a Node/Playwright project. Never two.
 
 Never create empty directories. No images means no `assets/`. No music means no `audio/music.wav`.
 
@@ -97,7 +102,7 @@ Never create empty directories. No images means no `assets/`. No music means no 
 |---|---|---|
 | Directories | one lowercase English word | `audio`, `assets`, `output`, `work`, `frames`, `check` |
 | Data files | English kebab-case | `script.txt`, `voiceover.wav`, `words.json`, `voiceover-norm.wav` |
-| Python modules | snake_case | `render.py`, `make_music.py` |
+| Build script | snake_case + extension of the pipeline | `render.py`, `render.mjs`, `make_music.py` |
 | Project folder | topic slug, kebab-case | `tiga-mitos-otak` |
 | Deliverable | topic slug | `output/tiga-mitos-otak.mp4` |
 | File contents | Indonesian | script, comments, reports |
@@ -127,7 +132,7 @@ If two candidates could both be the voiceover, or a file's role stays unclear af
 
 ### What this workflow does not create
 
-`project.json`, `timing.json`, `scenes.py`, `manifest.json`, `style.json`, `review/`, or a separate QC report. Creative decisions (font, voice, palette) are agreed with the user and live in `render.py`; check results are reported directly in the delivery message.
+`project.json`, `timing.json`, `scenes.py`, `manifest.json`, `style.json`, `review/`, or a separate QC report. Creative decisions (font, voice, palette) are agreed with the user and live in `render.<ext>`; check results are reported directly in the delivery message. One exception, because it is data and not a report: `work/words.json` (word timings) and the optional `output/<slug>.srt`.
 
 ### Starting behaviour
 
@@ -197,6 +202,10 @@ kecuali suara — suara yang menentukan panjang dan penyesuaian waktu video.
    Tegak (1080×1920, cocok untuk Reels/TikTok/Shorts) atau
    mendatar (1920×1080)? Kalau tidak disebut, saya pakai mendatar.
 
+6. Caption dan subtitle (opsional)
+   Caption di dalam video, berkas .srt untuk diunggah ke platform,
+   atau keduanya. Tanpa diminta, saya tidak membakarnya ke video.
+
 Anda tidak perlu mengganti nama berkasnya. Kirim apa adanya, saya yang
 merapikan. Kalau Anda tidak ingin menyiapkan apa pun, cukup bilang
 "buat semuanya otomatis" — saya yang memilih acuan gaya, gambar, dan
@@ -210,13 +219,14 @@ tipografinya.
 | Style reference video | `assets/reference.mp4` | Optional | Search Pinterest for `motion graphics` + topic keywords (stage 3); if nothing fits, design the style yourself |
 | Supporting images (1st, 2nd, …) | `assets/image-01.png`, `assets/image-02.png`, … | Optional | You find suitable images online, draw them in code, or both |
 | Screen orientation | — | Ask | Default landscape 1920×1080; portrait 1080×1920 |
+| Captions / subtitles | burned-in or `output/<slug>.srt` | Optional, asked once | No captions; offer the `.srt` in the delivery message |
 
 The table above is for your own reference. What reaches the user is the Indonesian block. Typography is **not** asked about — that is your call in stage 4, and if the right font is not installed you download it.
 
 ### Stage 3 — Confirm readiness
 
 - **Everything needed is present:** proceed without further questions. Treat user assets as the primary material. Tell the user in one line: `Semua bahan sudah lengkap. Saya mulai kerjakan.`
-- **Something is missing and unanswered:** ask. Never guess.
+- **Something is missing and unanswered:** ask exactly once, then continue with the documented default. Stage 2's list is the only ask; stage 3 never re-opens it. An unanswered orientation means landscape; unanswered music means no music; unanswered reference means you pick one. Only a missing **voiceover** with no way to generate one blocks the pipeline — everything else has a stated default.
 - **The user supplies a Pinterest URL as the reference:** do not ask again — that URL is the reference. Download it and continue.
 
   ```bash
@@ -276,7 +286,9 @@ Pilihannya:
    saya perkirakan dari jeda dan panjang kalimat. Sinkronisasinya bisa
    meleset sekitar sepersepuluh sampai setengah detik pada beberapa kata.
    ```
-4. With a reference video, extract frames and read its visual language: palette, typography, composition, cut rhythm, transition types, depth. Reference is inspiration only. Never copy shots, text placement, or animation order.
+
+   Write the result to `work/words.json` either way (`references/RENDER.md` §3). Every later stage reads that file: the timeline, the sync gate, and the optional subtitle track.
+4. With a reference video, extract frames and read its visual language: palette, typography, composition, cut rhythm, transition types, depth. Measure the cut rhythm (`references/RENDER.md` §4) instead of describing it from impression. Reference is inspiration only. Never copy shots, text placement, or animation order.
 
    Report what you found and what you will take, in Indonesian:
 
@@ -340,7 +352,11 @@ Read both reference documents before building anything:
 - `references/GUIDE.md` — creative direction, typography, asset animation, transitions, **translating ideas into visuals (§5), cross-scene variation (§6)**, audio mixing.
 - `references/RENDER.md` — environment check, fonts, render pipeline, ffmpeg commands, verification.
 
-**Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier glyph height, WCAG contrast, text collision (IoU), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against your renderer's data structures. Do not look for a shared library; every project has its own shapes.
+**Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier glyph height, WCAG contrast, text collision (coverage), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against your renderer's data structures. Do not look for a shared library; every project has its own shapes.
+
+Two checks are not optional because they protect the file itself, and both catch failures that look fine on screen:
+- **frame contiguity** before encoding (`RENDER.md` §6) — a missing PNG silently truncates the MP4;
+- **final mix loudness and tail floor** (`RENDER.md` §7) — a quiet mix or a music track that ends early passes every visual gate.
 
 Before writing scene code, give every core point one visual mechanism that can be drawn (`GUIDE.md` §5). If the plan is still "big word in the centre" for every scene, the idea isn't there yet.
 
@@ -355,9 +371,16 @@ Inspect the exported MP4 from start to finish, not just the timeline editor:
 5. Music supports and speech stays dominant.
 6. No black frames, frozen frames, glitches, or unintended audio defects.
 7. The MP4 plays. Actual duration equals the stage-4 total (never over the active cap), frame count = duration × 30, 30 fps, codec and resolution per spec, nothing after the final second, and the cap in use is stated (default 60 s or the number the user approved). All of it proven from the exported file's metadata.
-8. Gates in `references/RENDER.md` §7 pass: sync (no text appears before its word), geometry (safe area, size legibility, collision, contrast), audio tail (no unintended silence up to the final second), and repetition pattern (flag only, your call). Prove it with numbers and state them in the delivery message.
+8. Gates in `references/RENDER.md` §7 pass: sync (no text appears before its word), geometry (safe area, size legibility, collision, contrast), audio (no dead air inside the speech region; music present in the tail when music exists; mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP), and repetition pattern (flag only, your call). Prove it with numbers and state them in the delivery message.
 
-Check the creative side with your eyes, not a script: open a contact sheet of the export (`ffmpeg -i output/<slug>.mp4 -vf "fps=1,scale=300:-1,tile=6x8" work/check/sheet.png`). If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
+Check the creative side with your eyes, not a script: open a contact sheet of the export:
+
+```bash
+mkdir -p work/check
+ffmpeg -i output/<slug>.mp4 -vf "fps=1,scale=300:-1,tile=8x8" -frames:v 1 work/check/sheet.png
+```
+
+`-frames:v 1` is required — a tile grid is one image, and without it the command fails on the second frame. Eight columns reaches 60 s; for longer renders drop to `fps=1/2`. If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
 
 Fix everything you find before handing over. Deliver the MP4 using whatever mechanism the environment offers, or simply state its path. Project files are optional extras; the MP4 is mandatory.
 
@@ -370,21 +393,23 @@ Berkas   : [lokasi berkas]
 Durasi   : [Y] detik
 Bingkai  : [Y×30] bingkai, 30 fps
 Ukuran   : [W]×[H] ([tegak/mendatar])
-Format   : MP4, H.264, audio AAC
+Format   : MP4, H.264 (high), audio AAC stereo
 Batas    : [60 detik / angka yang Anda setujui]
 
 Pemeriksaan
 - Tidak ada bingkai hitam maupun bingkai beku
 - Semua teks muncul setelah kata yang diucapkan
 - Tidak ada teks bertabrakan atau keluar batas aman
-- Audio terisi penuh, tidak ada bagian sunyi yang tak disengaja
-- Volume puncak [X] dB, tidak pecah
+- Tidak ada bagian sunyi tak disengaja di dalam narasi
+- Kenyaringan [I] LUFS, puncak [TP] dBTP, tidak pecah
+- [Tidak ada frame yang hilang / jumlah frame sesuai]
 
 Bahan yang Anda berikan
 - Suara: [nama berkas asli]
 - Musik: [nama berkas asli / saya buat sendiri]
 - Acuan gaya: [tautan atau nama berkas]
 - Gambar: [jumlah] berkas
+- Sumber gambar: [URL + lisensi per gambar / tidak ada]
 
 Yang saya buat otomatis
 - [naskah / suara / musik / elemen grafis — sebutkan yang benar-benar otomatis]

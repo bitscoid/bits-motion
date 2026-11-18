@@ -9,7 +9,7 @@ Read this before building and rendering. All commands are examples — adapt fil
 4. Analysing a reference video
 5. Building frames deterministically
 6. Audio mixing and export
-7. Verifying the exported file (sync, geometry, audio tail)
+7. Verifying the exported file (sync, geometry, audio, loudness)
 8. Self-made background music
 9. Common traps
 10. Cleanup after delivery
@@ -37,7 +37,7 @@ Network access is often restricted. Check what actually works: if `pip` and `npm
 
 **This catalogue is a starting point, not a menu.** If the topic needs typography that isn't here, download it (next subsection). Picking an installed font merely because it exists is the fastest route to making every video look the same.
 
-Quick check: `fc-list | grep -iE "poppins|fredoka|caveat"` — empty means not installed (see §9).
+Quick check: `fc-list | grep -iE "poppins|fredoka|caveat"` — empty means not installed (see *Adding a new font* below).
 
 Match to the video's mood; at most 2–3 families per video (one display + one supporting, plus handwriting if it needs an accent):
 
@@ -122,6 +122,8 @@ If installation fails (blocked network, no permission), stop and report it with 
 
 Store frames as `work/frames/00000.png` through `work/frames/01199.png`. To save memory you can pipe straight into ffmpeg (`-f rawvideo -pix_fmt rgb24 -s WxH -r 30 -i -`).
 
+The build script is `render.<ext>` — `render.py` for the Python pipeline, `render.mjs` for Remotion, and so on. Same file, extension follows the pipeline; never carry two entry points.
+
 ## 3. Measuring and analysing the voiceover
 
 Duration:
@@ -161,6 +163,36 @@ a = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float3
 
 Take ASR output as-is even when the transcription is wrong (e.g. "berumasuk") — you need the word boundaries, not the spelling. ASR error of ±0.1 s is invisible; word-count estimation can be off by 2 s, which is glaring.
 
+Write the result to `work/words.json` — it is the one artefact every later stage reads (timeline, sync gate, and the optional subtitle export):
+
+```python
+import json
+json.dump({
+    "vo_delay": 1.0,
+    "segments": [{"start": s.start, "end": s.end, "text": s.text,
+                  "words": [{"word": w.word, "start": w.start, "end": w.end}
+                            for w in s.words]} for s in segs]
+}, open("work/words.json", "w"), ensure_ascii=False, indent=1)
+```
+
+Same file also produces a subtitle track for the platform upload, for free:
+
+```python
+def ts(t):
+    ms = int(round(t * 1000))                 # integer maths: 1.9996 s must not become ",1000"
+    h, ms = divmod(ms, 3600000)
+    m, ms = divmod(ms, 60000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+d = json.load(open("work/words.json"))
+off = d["vo_delay"]                            # read the delay, never re-type it
+# one cue per sentence, shifted onto the video timeline
+open("output/<slug>.srt", "w").write("".join(
+    f"{i}\n{ts(g['start'] + off)} --> {ts(g['end'] + off)}\n{g['text'].strip()}\n\n"
+    for i, g in enumerate(d["segments"], 1)))
+```
+
 If ASR is unavailable or fails: split time by `silencedetect` pauses, distribute words per phrase by syllable count, and **tell the user that word timing is approximate**.
 
 If the voiceover is delayed during mixing (e.g. starting at second 1), every ASR time must be shifted by that delay before use. Keep it as one constant (`VO_DELAY`) and derive all times from it — never add it manually per scene.
@@ -171,7 +203,9 @@ If the computed total (voiceover + ~2.5 s) exceeds `MAX_DUR` (default 60 s), sto
 
 ### When there is no voiceover
 
-1. **Generate with Gemini TTS** (needs `GEMINI_API_KEY`; example uses `gemini-3.8-flash-tts` — if it 404s, check Google's current TTS model list):
+1. **Generate with Gemini TTS** (needs `GEMINI_API_KEY`). Current models: `gemini-3.8-flash-tts` (best) and `gemini-3.8-flash-lite-tts` (separate quota). If either 404s, check Google's current model list.
+
+The TTS API is the **Interactions** endpoint today: `POST /v1beta/interactions`, style in `input[].content[].annotations[].style`, audio in `steps[].content[].data`. The older `:generateContent` + `inlineData` shape still exists but does not carry `speech_metadata`; use it only as a fallback.
 
 Build the payload with `json.dumps` (never inline the script into a curl `-d` — quotes and newlines corrupt the JSON and trigger 400 `INVALID_ARGUMENT`):
 
@@ -183,38 +217,48 @@ Build the payload with `json.dumps` (never inline the script into a curl `-d` �
 python3 - <<'PY'
 import json
 script = open('script.txt').read()
-# REQUIRED: text is verbatim ONLY, with no instructions. Instructions such as
-# "Read this warmly..." placed INSIDE text get read aloud by the 3.8 model
-# (measured: instruction + 3 words = 6.5 s; verbatim 3 words = 2.2 s).
-# Delivery goes through speech_metadata.style, the official channel that stays silent.
+# REQUIRED: `text` is verbatim ONLY, with no instructions. Instructions such as
+# "Read this warmly..." placed INSIDE text get read aloud (measured: instruction +
+# 3 words = 6.5 s; verbatim 3 words = 2.2 s). Delivery goes in
+# annotations[].style, the official channel that stays silent.
 payload = {
-    "contents": [{"parts": [{"text": script,
-        "speech_metadata": {"style": "warm, clear, slightly upbeat"}}]}],
-    "generationConfig": {
-        "responseModalities": ["AUDIO"],
-        "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Kore"}}}
-    }
+  "model": "gemini-3.8-flash-tts",
+  "input": [{"type": "user_input", "content": [{
+      "type": "text",
+      "text": script,
+      "annotations": [{"type": "speech_metadata", "style": "warm, clear, slightly upbeat"}]
+  }]}],
+  "response_format": {"type": "audio"},
+  "generation_config": {"speech_config": [{"voice": "Kore"}]}
 }
 json.dump(payload, open('work/tts-request.json','w'), ensure_ascii=False)
 PY
 
-curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent" \
+curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/interactions" \
   -H "x-goog-api-key: $GEMINI_API_KEY" -H "Content-Type: application/json" \
   -d @work/tts-request.json > work/tts-response.json
 
 python3 - <<'PY'
 import json, base64, sys
 d = json.load(open('work/tts-response.json'))
-if 'candidates' not in d:
+if 'error' in d:
     sys.exit(f"TTS failed, API response: {json.dumps(d)[:500]}")
-part = d['candidates'][0]['content']['parts'][0]
-data = base64.b64decode(part['inlineData']['data'])
-mime = part['inlineData'].get('mimeType', '')
-open('work/tts.wav' if 'wav' in mime else 'work/tts.pcm','wb').write(data)
-print('mimeType:', mime)
+# Interactions: last audio block wins; unary responses are complete WAV (RIFF header)
+blocks = [c for s in d.get('steps', []) if s.get('type') == 'model_output'
+            for c in s.get('content', []) if c.get('type') == 'audio' and c.get('data')]
+if blocks:
+    open('work/tts.wav','wb').write(base64.b64decode(blocks[-1]['data']))
+    print('interactions: wrote work/tts.wav')
+else:
+    # legacy generateContent fallback
+    part = d['candidates'][0]['content']['parts'][0]
+    data = base64.b64decode(part['inlineData']['data'])
+    mime = part['inlineData'].get('mimeType', '')
+    open('work/tts.wav' if 'wav' in mime else 'work/tts.pcm','wb').write(data)
+    print('legacy: mimeType', mime)
 PY
-# 3.8 returns complete audio/wav (RIFF header) — write .wav directly.
-# For mimeType audio/l16 (raw PCM, older models), decode manually:
+# Unary requests return complete WAV. For audio/l16 (raw PCM, streaming or older
+# models) decode manually: 24 kHz, mono, s16le.
 [ -f work/tts.pcm ] && ffmpeg -f s16le -ar 24000 -ac 1 -i work/tts.pcm "audio/voiceover.wav" || cp work/tts.wav "audio/voiceover.wav"
 ```
 
@@ -246,6 +290,19 @@ ffmpeg -framerate 2 -i work/ref/%03d.png -vf "scale=320:-1,tile=6x5" work/ref/co
 ```
 
 Read the extracted frames (a contact sheet works well) for palette, typography, composition, and cut rhythm. Take principles, not copies. The reference's orientation and aspect become the default output orientation.
+
+Cut rhythm is measurable — do not rely on impression. Count the actual cuts and their spacing, then decide whether to sit near or against that rhythm:
+
+```bash
+# scene changes (threshold 0.3 = a real cut, not a fade)
+ffmpeg -i "assets/reference.mp4" -vf "select='gt(scene,0.3)',showinfo" -an -f null - 2>&1 \
+  | grep -o "pts_time:[0-9.]*" | cut -d: -f2 \
+  | awk 'NR==1{printf "first cut at %.2fs\n", $1; p=$1; next}
+         {printf "cut at %.2fs (gap %.2fs)\n", $1, $1-p; p=$1; g+=$1-p; n++}
+         END{if(n) printf "average gap %.2fs over %d gaps\n", g/n, n}'
+```
+
+Average gap plus the shortest and longest gap describe the pace in numbers; that is what you match or deliberately break.
 
 For a URL from the user, download with `yt-dlp "<url>" -o "assets/reference.mp4"` before analysing.
 
@@ -335,38 +392,54 @@ awk -v d="$DUR" -v m="$MAX_DUR" 'BEGIN{if(d>m) print "OVER CAP "m" S: stop and a
 
 Use those `DUR` and `FRAMES` values for the whole render (frames drawn, timeline, export). The voiceover is delayed to start at second 1 (`adelay`), padded to the end, and the music is looped, trimmed to the video length, lowered in volume, and ducked under speech.
 
+**Check the frame sequence is contiguous before encoding.** Resume-skipping leaves holes when a worker dies, and `%05d` input silently stops at the first missing index — a 5-frame sequence with frame 00002 missing encoded only 2 frames. Measure:
+
+```python
+import os
+FRAMES = 840
+missing = [i for i in range(FRAMES) if not os.path.exists(f"work/frames/{i:05d}.png")]
+assert not missing, f"{len(missing)} frames missing, first: {missing[:3]}"
+```
+
 **Three steps — never merged into one `filter_complex`.** Combining `loudnorm` with `apad` in one chain kills the audio tail: loudnorm also processes the padding, dropping the tail to −91 dB (measured on the single-chain example that used to be here: `silence_start 40.86` in a 43 s video). So split:
 
 ```bash
 # 1) normalise the voiceover into its own file
 ffmpeg -y -i "audio/voiceover.wav" -af "loudnorm=I=-16:TP=-1.5:LRA=11" -ar 48000 work/voiceover-norm.wav
 
-# 2) prepare the music in its own file: level + fade-out. Never add afade=t=in --
-#    music starting from silence reads as unintended silence to the §7 gate.
-ffmpeg -y -i "audio/music.wav" -af "volume=0.40,afade=t=out:st=$FADE_ST:d=2.5" -ar 48000 work/music-norm.wav
+# 2) prepare the music in its own file: loop to the full length, level, fade to a
+#    floor (never to absolute zero). Never add afade=t=in -- music starting from
+#    silence reads as unintended silence to the §7 gate.
+#    -stream_loop -1 is what makes "loop the music" true: a 10 s track on a 28 s
+#    video without it leaves 18 s of dead air (measured).
+ffmpeg -y -stream_loop -1 -i "audio/music.wav" \
+  -af "volume='0.40*(1-0.94*min(max(0,(t-$FADE_ST)/2.5),1))':eval=frame" \
+  -ar 48000 -t $DUR work/music-norm.wav
 
 # 3) then combine: adelay + apad + duck + amix
-ffmpeg -y -framerate 30 -i work/frames/%05d.png -i work/voiceover-norm.wav -i work/music-norm.wav \
+ffmpeg -y -framerate 30 -start_number 0 -i work/frames/%05d.png \
+  -i work/voiceover-norm.wav -i work/music-norm.wav \
   -filter_complex "\
 [1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,asetpts=PTS-STARTPTS,asplit=2[vo1][vo2];\
 [2:a]atrim=0:$DUR,asetpts=PTS-STARTPTS[bg];\
 [bg][vo1]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[duck];\
 [duck][vo2]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.85:level=0[aout]" \
   -map 0:v -map "[aout]" \
-  -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -r 30 -frames:v $FRAMES \
-  -c:a aac -b:a 192k -ar 48000 -t $DUR \
+  -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -profile:v high -g 60 -r 30 -frames:v $FRAMES \
+  -c:a aac -b:a 192k -ac 2 -ar 48000 -t $DUR \
   -movflags +faststart "output/<slug>.mp4"
 ```
 
-`FADE_ST` derives from video duration, not music duration: `DUR - 2.5` (the `awk` recipe above already does this). The fade must finish before the final second, but the music must not touch absolute zero on the last frame — a residual −25 dB tail passes the gate, absolute zero does not.
+`FADE_ST` derives from video duration, not music duration: `DUR - 2.5` (the `awk` recipe above already does this). The fade ends near the final second but must not reach absolute zero — measured, the old `afade=t=out:st=DUR-2.5:d=2.5` ended exactly at zero and left the last **0.8 s at −61.7 dB**, which the gate treats as dead air. The expression above fades to a −32 dB floor instead; measured last-0.5-s level **−45 dB with music echoing the tail**, which passes. `-ac 2` matters because a mono voiceover otherwise exports a mono AAC track; measured `channels=1` without it, `channels=2` with it.
 
 Notes:
 - `loudnorm` equalises voiceover loudness (target I=-16 LUFS, TP=-1.5) so user recordings and TTS results sit at the same level. It works internally at 192 kHz; `-ar 48000` in step 1 restores the sample rate.
-- `normalize=0` needs ffmpeg 7.0+. On 6.x drop `normalize=0` and use `volume=2` — measured identical on 7.1 (−18.5 dB both ways). Never combine them: `normalize=0` + `volume=2` reaches max 0.0 dB, i.e. clipping.
-- Without music: skip step 2, and in step 3 use only `[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,asetpts=PTS-STARTPTS,afade=t=out:st=<DUR-0.5>:d=0.5[aout]` (compute `DUR-0.5` with `awk` like `FADE_ST`).
+- `amix`'s `normalize` option predates 7.0 (it exists in 5.1). What is version-sensitive is only the *result* of combining options — so keep exactly one loudness correction in the chain and confirm with `volumedetect`/`ebur128` instead of trusting the formula.
+- Without music: skip step 2, and in step 3 use only `[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,asetpts=PTS-STARTPTS[aout]`. Do **not** add a closing `afade`: `apad` already fills the tail with digital zero and an extra fade changes nothing except the chance of masking a real defect. Without music the tail is silent by definition — the gate in §7 allows it (it measures the floor only when music is present).
 - Without voiceover (draft): use music only, and label it a draft.
 - If the input is raw video rather than an image sequence, still force `-r 30` and `-frames:v $FRAMES`.
 - If the user sets their own target duration, replace `DUR` with it (as long as the voiceover fits), set `MAX_DUR` at least to that target, and recompute `FRAMES` and `FADE_ST` with the same formulas.
+- `-g 60` (2 s GOP) plus `-profile:v high` keeps seeking responsive and the file playable on every platform that accepts H.264; `+faststart` moves the index to the front.
 
 ## 7. Verifying the exported file
 
@@ -385,23 +458,64 @@ Target: container ≈ `DUR` seconds (to three decimals), `FRAMES` video frames, 
 Detect unintended problems:
 
 ```bash
-# black frames
-ffmpeg -i output/<slug>.mp4 -vf blackdetect=d=0.1:pix_th=0.05 -an -f null - 2>&1 | grep black_
+# black frames -- pix_th=0.02, NOT 0.05. A legitimate dark background such as
+# 0x0B0B0F (luma 0.043) is reported as "black" at the 0.05 default; measured,
+# true 0x000000 is still caught at 0.02, so 0.02 catches defects without
+# flagging dark design. Use d=0.5 so single transition frames are ignored.
+ffmpeg -i output/<slug>.mp4 -vf blackdetect=d=0.5:pix_th=0.02 -an -f null - 2>&1 | grep black_
 # frozen frames — n=0: only truly identical frames count as a freeze.
 # NEVER use n=-60dB: on flat graphics, micro-changes between frames (thousands of
 # pixels, max diff ~220) still get reported as a freeze -> false positives on video
 # that clearly moves.
 ffmpeg -i output/<slug>.mp4 -vf freezedetect=n=0:d=1.0 -an -f null - 2>&1 | grep freeze_
-# unintended silence and loudness
+# raw silence dump and peak level (read it; the pass/fail rule is the windowed
+# gate below -- a silent tail is legitimate when the video has no music)
 ffmpeg -i output/<slug>.mp4 -af silencedetect=noise=-50dB:d=0.5 -vn -f null - 2>&1 | grep silence_
 ffmpeg -i output/<slug>.mp4 -af volumedetect -vn -f null - 2>&1 | grep -E "mean_volume|max_volume"
 ```
 
 **Motion gate:** `freezedetect=n=0:d=1.0` must come back empty, except for a deliberate, timeline-documented rest (at most one, ≤1.5 s, near the close). A freeze means the render is genuinely still — go back to §5, add micro camera motion or element animation, re-render. Report this gate result alongside the duration.
 
-**Audio tail gate:** `silencedetect` on the final file must be empty all the way to the last second, not merely in the middle. Music dying before the video ends shows up as `silence_start` in the final seconds and is a defect, not a choice. The most common cause is `loudnorm` placed inline with `apad` in one `filter_complex` (measured: −91 dB over the last 2.1 s while the source was −15 dB). Normalise the voiceover into its own file first, then mix.
+The lead-in is not covered by this gate: the first `VO_DELAY` (1 s) holds the title/accent and is allowed to sit still, because nothing is being narrated yet. A freeze reported **entirely** inside `0..1 s` is not a defect; a freeze that reaches into speech is.
 
-**Write the sync, geometry, and repetition checks yourself when needed.** The rules are complete in prose below and in `GUIDE.md` §2: safe area 4%, two-tier glyph height, contrast per role, collision IoU, repetition patterns. Translate them into code against your renderer's data structures.
+**Audio gate — windowed, not whole-file.** A whole-file `silencedetect must be empty` contradicts the spec: the tail after speech is ~1.5 s of legitimate silence whenever there is no music, so the plain command can never pass. Two checks, both measured on the export:
+
+```bash
+VO_DELAY=1              # speech starts here
+VO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 audio/voiceover.wav)
+HAS_MUSIC=1             # 0 when the video has no music track
+SE=$(awk -v a=$VO_DELAY -v b="$VO_DUR" 'BEGIN{printf "%.2f", a+b}')
+
+# 1) no dead air inside the speech region
+ffmpeg -i output/<slug>.mp4 -af silencedetect=noise=-50dB:d=0.5 -vn -f null - 2>&1 \
+  | grep silence_start \
+  | awk -v se="$SE" '$NF>0.1 && $NF<se-0.2 {print "FAIL dead air at " $NF "s"; bad=1} END{exit bad}'
+
+# 2) with music, the tail must still carry sound (music died early = defect)
+if [ "$HAS_MUSIC" = 1 ]; then
+  T=$(ffmpeg -hide_banner -sseof -0.5 -i output/<slug>.mp4 -af volumedetect -vn -f null - 2>&1 \
+      | sed -n 's/.*mean_volume: \(-\?[0-9.]*\) dB/\1/p')
+  awk -v t="$T" 'BEGIN{if(t<-50) {print "FAIL tail floor "t" dB (music died early)";exit 1}
+    print "tail floor "t" dB OK"}'
+fi
+```
+
+Verified on real builds: a music track that stops 1 s early reads **−61.7 dB** in the last half second and fails; the same video with music carried to the end reads **−45 dB** and passes; a 0.8 s hole inside narration is caught by check 1; a video with no music passes both because the silent tail is expected.
+
+`silence_start` prints the time as the last field, so use `$NF` — the logger prefix `[silencedetect @ 0x…]` shifts every other column.
+
+The historical −91 dB tail (from `loudnorm` inline with `apad`) is still the most common cause of check 2 failing when music is present. Normalise the voiceover into its own file first, then mix (§6).
+
+**Loudness gate.** The voiceover is normalised, but the finished mix is not: quiet music leaves the whole file quiet, and every platform then re-normalises it inconsistently. Measure the export:
+
+```bash
+ffmpeg -hide_banner -nostats -i output/<slug>.mp4 -af ebur128=peak=true -f null - 2>&1 \
+  | grep -E "^\s+(I|Peak):" | sed 's/^ *//'
+```
+
+Target: **I between −17 and −14 LUFS** (a −16 LUFS voiceover with ducked music lands near −16, measured −16.0 on a 28 s build) and **true peak ≤ −1 dBTP**. A build with the voiceover turned down to 15% measured **−32.5 LUFS** — that is the failure this gate exists for. Report both numbers in the delivery message; `max_volume` alone does not describe loudness.
+
+**Write the sync, geometry, and repetition checks yourself when needed.** The rules are complete in prose below and in `GUIDE.md` §2: safe area 4%, two-tier glyph height, contrast per role, collision cover, repetition patterns. Translate them into code against your renderer's data structures.
 
 Suggested shape: collect every text bbox during render, then inspect at the end. What matters is that the output is **advice, not PASS/FAIL** — the decision stays yours.
 
@@ -440,33 +554,57 @@ On failure, fix the time table — never nudge numbers inside a scene (§5).
 **Geometry gate.** Three checks, all using the font metrics actually in play:
 
 ```python
-# 1) safe area: no glyph crosses 4% of the frame edge (same value as GUIDE.md §2)
-bb = d.textbbox((px, py), s, font=f, anchor=anchor)
-assert bb[0] > W * 0.04 and bb[2] < W * 0.96
-assert bb[1] > H * 0.04 and bb[3] < H * 0.96
+# 1) safe area: no glyph crosses 4% of the frame edge (same value as GUIDE.md §2).
+#    Use textbbox with the SAME anchor you draw with. Without anchor="mm" the box is
+#    relative to the top-left origin (measured: drawing "92" at (200,100) returns
+#    (200,111,284,157) at the default anchor), so the comparison is meaningless.
+bb = d.textbbox((px, py), s, font=f, anchor="mm")
+assert bb[0] > W * 0.04 and bb[2] < W * 0.96, f"crosses side safe area: {s}"
+assert bb[1] > H * 0.04 and bb[3] < H * 0.96, f"crosses top/bottom safe area: {s}"
 
-# 1b) legibility: GLYPH height, not font size (capital glyphs ~0.75x font).
-#     two tiers per GUIDE.md §2: primary >=4%H, supporting >=2.5%H
+# 1b) legibility: GLYPH height from the measured box, not the size argument.
+#     Two tiers per GUIDE.md §2, against the SHORT side so portrait and landscape
+#     share one number: short side 1920 -> primary 77px, supporting 48px;
+#     short side 1080 -> primary 43px, supporting 27px.
+S = min(W, H)
 gh = bb[3] - bb[1]
-assert gh >= H * (0.04 if is_main else 0.025), f"text too small: {s} ({gh}px)"
+assert gh >= S * (0.04 if is_main else 0.025), f"text too small: {s} ({gh}px)"
 
-# 2) text collision: IoU of glyph boxes
-def iou(a, b):
+# 2) text collision: coverage, not IoU.
+#    IoU < 0.16 is too loose: two 100px-tall lines overlapping by 20px score 0.111
+#    and pass while visibly colliding. Measure how much of the SMALLER box is
+#    covered instead -- same pair scores 0.20, and a 5px overlap still scores 0.05.
+def cover(a, b):
     x0, y0 = max(a[0], b[0]), max(a[1], b[1])
     x1, y1 = min(a[2], b[2]), min(a[3], b[3])
     if x1 <= x0 or y1 <= y0:
         return 0.0
     inter = (x1 - x0) * (y1 - y0)
-    return inter / ((a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - inter)
+    return inter / min((a[2]-a[0])*(a[3]-a[1]), (b[2]-b[0])*(b[3]-b[1]))
 
-assert iou(bb_a, bb_b) < 0.16
+# identical boxes are a deliberate re-draw (text over its own highlight) -- skip.
+# Only glyph boxes are compared against each other, never against the panel or card
+# behind them, so a label sitting on a card is not a collision.
+if bb_a != bb_b:
+    assert cover(bb_a, bb_b) < 0.02, f"text overlaps: {s}"
 
 # 3) contrast: WCAG ratio, threshold tied to the text ROLE (GUIDE.md §2),
 #    not to pixel size -- small moving text reads worse than static text
 assert ratio(fill, bg_color) >= (3.0 if is_main else 4.5), f"contrast too low: {s}"
 ```
 
-**Contrast gate** uses the same WCAG formula as `GUIDE.md` §2, with the threshold tied to the text's role: **3.0:1** for primary text, **4.5:1** for supporting text. Measured on palettes in common use: ink-on-cream and cream-on-dark pass well above 4.5:1, but a light salmon accent on cream reaches only **1.85:1** — a hard fail for any text; darkening that accent to `(166, 82, 70)` brings it to **4.56:1**, which passes for supporting text. When this gate rejects, do not lower the threshold: change the colour, move the text onto a dark background, or place a solid panel behind it.
+A label sitting inside a title block legitimately scores cover 1.0 — that is why the identical-box exclusion exists and why this is advice to read, not a hard fail. What it must catch: two independent lines that share any real band of pixels.
+
+**Contrast gate** uses the same WCAG formula as `GUIDE.md` §2, with the threshold tied to the text's role: **3.0:1** for primary text, **4.5:1** for supporting text. Measured pairs, reproducible with the formula above:
+
+| Foreground | Background | Ratio | Verdict |
+|---|---|---|---|
+| `(166, 82, 70)` darkened accent | `(245, 241, 234)` cream | **4.76:1** | passes supporting |
+| `(166, 82, 70)` | `(250, 246, 238)` cream | **4.97:1** | passes supporting |
+| `(238, 150, 130)` light salmon | `(245, 241, 234)` cream | **2.00:1** | hard fail |
+| `(20, 20, 20)` ink | `(250, 244, 232)` cream | **16.8:1** | passes everything |
+
+Any accent below ~3:1 on cream fails for text of any role; the fix is to darken the accent until the measured ratio clears, not to lower the threshold. When this gate rejects, change the colour, move the text onto a dark background, or place a solid panel behind it.
 
 ### Third gate: repetition pattern (flags, never rejects)
 
@@ -477,17 +615,24 @@ This gate **does not judge**. It surfaces scenes with the same structure; you de
 #   mass_position : where the ink centroid sits (left/centre/right, top/middle/bottom)
 #   density       : ratio of inked pixels
 #   background    : light / dark
+#
+# "ink" must mean "differs from the background", not "darker than 110". On a dark
+# background with light text, `g < 110` selects the BACKGROUND and every scene
+# returns the same centroid (measured: 0.5, 0.5 on two completely different
+# layouts). Compare against the frame's own modal luma instead.
 def signature(frame_rgb):
-    g = np.array(frame_rgb.convert("L"))
-    ink = g < 110
+    g = np.array(frame_rgb.convert("L")).astype(int)
+    bg = np.bincount(g.ravel()).argmax()          # modal value = background
+    ink = np.abs(g - bg) > 40                      # anything that is not background
     if ink.sum() < 500:
         return ("empty",)
     ys, xs = np.nonzero(ink)
+    h, w = g.shape
     return (
-        round(xs.mean() / g.shape[1], 1),   # 0.0 left .. 1.0 right
-        round(ys.mean() / g.shape[0], 1),
+        round(xs.mean() / w, 1),                   # 0.0 left .. 1.0 right
+        round(ys.mean() / h, 1),
         round(ink.mean(), 2),
-        "dark" if g.mean() < 100 else "light",
+        "dark" if bg < 100 else "light",
     )
 
 sigs = [signature(f) for f in mid_frame_of_each_scene]
@@ -495,6 +640,8 @@ for i in range(1, len(sigs)):
     if sigs[i] == sigs[i - 1]:
         print(f"scenes {i} and {i+1} share a pattern: {sigs[i]}")
 ```
+
+Vary composition on purpose, and record it: keep a small per-scene vector (composition zone, density, scale, background) and refuse to leave **three consecutive scenes** on the same vector. Two in a row can be a deliberate pair; three is the "same layout, different words" failure `GUIDE.md` §6 warns about.
 
 If two consecutive scenes share a pattern, **do not change them automatically**. Write one sentence in the timeline:
 
@@ -514,8 +661,15 @@ Two things that make these gates mislead:
 Visual check: extract frames at key points (start, each scene change, end) and look for yourself at legibility, spelling, cropping, and collisions.
 
 ```bash
+mkdir -p work/check          # ffmpeg will not create it -- "Could not open file" otherwise
 ffmpeg -i output/<slug>.mp4 -vf "fps=1/2,scale=640:-1" work/check/%02d.png
 ffmpeg -ss $(awk -v d="$DUR" 'BEGIN{print d-0.1}') -i output/<slug>.mp4 -frames:v 1 work/check/last.png
+```
+
+The contact sheet needs `-frames:v 1`: a `tile` grid is one image, and without it ffmpeg tries to write that image once per input frame and dies at the second one (`Cannot write more than one file with the same name`, exit −22). A 60 s video at `fps=1` yields 60 thumbnails, which exceeds `6x8` (48 cells) — use `8x8` for anything over 48 s, or a lower `fps`:
+
+```bash
+ffmpeg -i output/<slug>.mp4 -vf "fps=1,scale=300:-1,tile=8x8" -frames:v 1 work/check/sheet.png
 ```
 
 ## 8. Self-made background music
@@ -544,11 +698,19 @@ Use at most a few per video, always below the voiceover level, and tell the user
 - **`amix` + `volume` — never use both.** Measured on ffmpeg 7.1 with a `loudnorm`-processed voiceover (−17.0 dB mean, −1.5 max): `amix` default `normalize=1` → −24.5 dB; `amix` default + `volume=2` → −18.5 dB; `amix normalize=0` → −18.5 dB (**identical**); `normalize=0` + `volume=2` → −12.5 dB, max **0.0 dB (clipping)**.
 
   Conclusion: `volume=2` with the default `normalize` equals `normalize=0`, so the §6 example is safe on both 6.x and 7.x. The danger is combining them. Pick one, then measure with `volumedetect` — never trust the formula, because `amix` defaults change between versions. If `max_volume` hits 0.0 dB despite `alimiter`, check whether `volume` and `normalize=0` are both applied, then check alimiter's `level` option.
-- **`loudnorm` inline + `apad` = dead audio tail:** never combine them in one `filter_complex`. Normalise the voiceover into a separate file first (three-step recipe in §6, gate in §7). Measured: one chain → `silence_start 40.86` in a 43 s video, tail −91 dB; three steps → tail −25 to −33 dB, `silencedetect` empty.
+- **`loudnorm` inline + `apad` = dead audio tail:** never combine them in one `filter_complex`. Normalise the voiceover into a separate file first (three-step recipe in §6, gate in §7). Measured: one chain → `silence_start 40.86` in a 43 s video, tail −91 dB; three steps → tail −25 to −33 dB, no dead air inside the speech region.
 - **`afade=t=in` on music trips the audio tail gate:** music starting from silence reads as unintended silence (measured: `silence_start 0`, 0.53 s). Let music enter at full level; fade only at the end.
-- **`textbbox` with `anchor` is not the glyph shape:** treating bb[1]/bb[3] as symmetric around the anchor point is wrong for numerals and capital text. Always compute the bbox centre offset from the anchor before placing inside a shape (see `GUIDE.md` §2).
+- **`afade=t=out` ending exactly at the last frame is silence, not a fade-out:** measured, `st=DUR-2.5:d=2.5` on a 28 s video left the final **0.8 s at −61.7 dB** — indistinguishable from the music having stopped. Fade to a floor with a `volume` expression (§6), or stop the fade earlier.
+- **Music shorter than the video:** without `-stream_loop -1` the track simply ends and the rest is dead air (measured: 10 s track on a 28 s video → `silence_start 26.0`). The pipeline promises the music is looped; loop it in step 2.
+- **Mono output from a mono voiceover:** `-ac 2` on export. Measured `channels=1` without it; platforms accept mono but stereo costs nothing.
+- **`silencedetect` `$3` is not the timestamp.** The logger writes `[silencedetect @ 0x…] silence_start: 12.34`, so the time is the **last** field (`$NF`). Filtering on `$3` silently matches nothing and every gate appears to pass.
+- **`textbbox` with `anchor` is not the glyph shape:** treating bb[1]/bb[3] as symmetric around the anchor point is wrong for numerals and capital text. Always compute the bbox centre offset from the anchor before placing inside a shape (see `GUIDE.md` §2). And always pass the **same anchor** you draw with — at the default anchor the returned box is relative to the draw origin, not the canvas, so `assert bb[0] > W*0.04` compares an x-offset to a canvas margin.
+- **`blackdetect` default `pix_th=0.1` flags legitimate dark design:** a `0x0B0B0F` background (luma 0.043) is reported as black from `pix_th=0.05` upward; at `0.02` it is clean while true `0x000000` is still caught. Use `pix_th=0.02`.
+- **`tile` without `-frames:v 1`** writes the grid once per input frame and fails on the second (`Cannot write more than one file with the same name`, exit −22). Also make sure the tile grid has room: 60 s at `fps=1` is 60 frames, more than `6x8`.
+- **Missing frames mid-sequence truncate the encode:** `-i work/frames/%05d.png` stops at the first gap, and `-pattern_type glob` reorders but does not fill. Measured: a 5-file sequence with `00002.png` missing encoded 2 frames. Assert contiguity before encoding (§6).
+- **SRT timestamps from float seconds misformat:** `int(round((s % 1) * 1000))` yields `",1000"` for 1.9996 s, which players reject. Convert to integer milliseconds first, then `divmod` (recipe in §3).
 - **Small idle elements quantised by the encoder:** dots/particles under ~15 px radius that merely pulse in a large flat area can vanish after encoding (CRF 18+), leaving identical decoded frames → a real freeze in the MP4 even though the renderer drew motion. Enlarge the element and move its position, not just its radius (a solid antialias-free circle changing radius often alters no pixel at all).
 
 ## 10. Cleanup after delivery
 
-`work/` holds every intermediate file: `frames/`, `ref/`, `check/`, normalised audio, and timing JSON. It can reach hundreds of megabytes and the user does not need it. Once the video is verified and delivered, delete the whole `work/`; keep only `script.txt`, `render.py`, `audio/`, `assets/`, and `output/`. Mention in the delivery message that intermediates were cleaned up.
+`work/` holds every intermediate file: `frames/`, `ref/`, `check/`, normalised audio, and timing JSON. It can reach hundreds of megabytes and the user does not need it. Once the video is verified and delivered, delete the whole `work/`; keep only `script.txt`, `render.<ext>`, `audio/`, `assets/`, and `output/` (plus `output/<slug>.srt` when you generated subtitles). Mention in the delivery message that intermediates were cleaned up.

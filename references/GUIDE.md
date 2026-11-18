@@ -36,12 +36,21 @@ Rules:
 - Break copy into short phrases. Never show a whole paragraph at once. Highlight keywords only.
 - Keep clear levels: title, keyword, supporting line, small label.
 - Avoid random capitals, hard-to-read faces, and decorative excess.
-- Respect the safe area: important elements stay at least **4%** from the frame edge. Use that number and no other, so there is never a second truth about it (the geometry gate in `RENDER.md` §7 uses 4%).
-- The smallest text must stay legible at output resolution. **The threshold is glyph height, not font size** — capital glyphs are roughly 0.75× the font size, so `truetype(size=100)` yields ~75 px glyphs. Measure with `textbbox`, never from the `size` argument. Two tiers:
-  - **primary text / keywords**: glyph height ≥ 4% of frame height (1920 → 77 px, meaning font ≈ 102 px).
-  - **supporting text / labels / small chips**: glyph height ≥ 2.5% of frame height (1920 → 48 px, font ≈ 64 px), and must clear 4.5:1 contrast because it is small.
+- Respect the safe area: important elements stay at least **4%** from the frame edge — one number, so there is never a second truth about it (the geometry gate in `RENDER.md` §7 uses 4%).
 
-  If a supporting line will not fit at 2.5% alongside other elements, cut words from that line — never lower the threshold. Measure the result; don't estimate.
+  **Short-form platforms need more.** 4% is the floor for the file itself; on Reels, TikTok, Shorts and Stories the platform UI covers roughly the bottom 12–15% and the right 10–12% with captions, buttons and progress. For a **portrait** export (`1080×1920`), keep primary text inside **10% from the bottom and 12% from the right**, and say in the delivery message which zone you used. Landscape/YouTube keeps the plain 4%. This is a platform constraint, not taste — measure it, and never let a keyword land in the covered band. The 4% gate still runs on everything; the platform band is a second, stricter margin applied on top for portrait.
+- The smallest text must stay legible at output resolution. **The threshold is glyph height, not font size.** Two tiers, measured as a fraction of the **short side** so portrait and landscape share one number:
+
+  | Tier | Glyph height | Short side 1920 | Short side 1080 |
+  |---|---|---|---|
+  | primary / keywords | ≥ 4% | 77 px | 43 px |
+  | supporting / labels / chips | ≥ 2.5% | 48 px | 27 px |
+
+  Font size to reach that height depends on the face: measured on DejaVu Sans Bold, capitals are **0.73× the size**. So on a 1080 short side, primary needs **size ≈ 60** and supporting **≈ 37**; on 1920, **≈ 105** and **≈ 66**. A condensed or display face has a different ratio — measure `textbbox` once for the font you chose and solve for the size; never assume 0.75 or copy a number from a table for a different face.
+
+  Writing only the 1920 figures is what makes a landscape video ship with text half the intended size. Measure the result; don't estimate.
+
+  If a supporting line will not fit at 2.5% alongside other elements, cut words from that line — never lower the threshold.
 - Check text-against-background contrast in code, never by judging colour names. Thresholds are measurable and tied to the text's **role**, not its pixel size:
   - **primary text / keywords: 3.0:1**
   - **supporting text / labels / chips: 4.5:1** — stricter than WCAG "large text", because small moving text reads far worse than static text of the same size.
@@ -62,6 +71,23 @@ def ratio(a, b):
 ```
 
   On failure: place a solid panel behind the text or darken the area — never rely on a thin drop shadow. Text over user images must be measured against the pixels actually behind it (sample the region), not the image's dominant colour.
+
+  **Pick the accent by measurement, not by eye.** A palette pass that removes the whole failure class: choose the topic's hue, then walk its lightness until the measured ratio clears the threshold for the role it will carry.
+
+```python
+import colorsys
+def fit_accent(rgb, bg, target):
+    """Darken/lighten `rgb` in HSL until it clears `target` against `bg`."""
+    h, l, s = colorsys.rgb_to_hls(*(c / 255 for c in rgb))
+    for _ in range(60):
+        cand = tuple(round(c * 255) for c in colorsys.hls_to_rgb(h, l, s))
+        if ratio(cand, bg) >= target:
+            return cand
+        l = max(0.0, l - 0.012)
+    return (0, 0, 0)                     # fall back to ink, never to a failing colour
+```
+
+Run it once per role (primary 3.0, supporting 4.5) and use the result everywhere the accent carries text. The accent then stays one colour across the video — `§6`'s "hold one thing constant" — while never shipping an unreadable pair.
 - **Centring is measured, not delegated to `anchor`.** `anchor="mm"` centres the font's em box, not the glyph shape — numerals, capital titles, and text with descenders visibly drift inside a shape. For text sitting inside an object (a numeral in a circle, a label on a card, text in a colour block), offset by the glyph bbox:
 
 ```python
@@ -135,6 +161,19 @@ A short video with a dozen scenes slides easily into "same layout, different wor
 
 Check the result with a contact sheet (`ffmpeg ... tile`) before export: if every thumbnail follows the same pattern, variation is insufficient.
 
+**Make the check quantitative.** Rate each scene on four axes and keep the vector beside the timeline; three consecutive scenes on the same vector is the failure, not two.
+
+```python
+scene["vary"] = dict(
+    zone   = "left | centre | right | edge | full",   # where the mass sits
+    density= "airy | medium | dense",
+    scale  = "small | normal | oversized",            # oversized = bleeds off-frame
+    bg     = "light | dark",
+)
+```
+
+Two identical neighbours can be a deliberate pair (a before/after, a repeat motif). Three is the signature of a template. `RENDER.md` §7's repetition gate measures the same thing from the rendered pixels and prints it; this vector is what you consult while planning, before any frame is drawn.
+
 ## 7. Sync with the voiceover
 
 The voiceover is the primary timing source; total duration is set in stage 4 of `SKILL.md` (voice + lead-in + tail, capped by `MAX_DUR`, default 60 s).
@@ -147,13 +186,37 @@ Motion must feel like a response to the voice, not random spinning. Visual effec
 
 Text without a supporting word in the voiceover remains legitimate (silent emphasis) — record the reason in the timeline; do not delete it merely because the sync gate cannot verify it.
 
+**Captions are a second, separate layer.** Kinetic typography is the design; burned-in captions are the accessibility and retention baseline every short-form platform expects. If the user wants them, they come from the same `work/words.json` (`RENDER.md` §3) and never replace the kinetic type — style them small, low, and steady, in the covering safe zone (`§2`), with at most 3 words per cue. A subtitle file (`output/<slug>.srt`) is free from the same data; offer it whenever the video is going to a platform.
+
 ## 8. Music and audio mixing
 
 - The voiceover stays clear and dominant. Duck the music under speech, especially during important information.
 - Align some transitions or animation accents to the beat when it genuinely suits the narration.
 - Use sound effects sparingly; they never compete with the narrator.
 - Never speed up speech or cut words to hit a duration. Preserve natural rhythm and pauses.
-- Fade music out smoothly and end audio exactly on the final second — no tail, no abrupt cut.
-- Prevent clipping, distortion, sudden level changes, and unintended silence.
+- Fade music out smoothly and end audio exactly on the final second — no tail, no abrupt cut. Fade **to a floor, not to absolute zero**: measured, ending the fade exactly on the last frame leaves the final 0.8 s at −61.7 dB, which is indistinguishable from the music having died. The recipe in `RENDER.md` §6 does this with a `volume` expression.
+- Prevent clipping, distortion, sudden level changes, and unintended silence. Measure the finished mix: **I between −17 and −14 LUFS, true peak ≤ −1 dBTP** (`RENDER.md` §7). A quiet mix passes every other gate and still plays badly on every platform.
+- Music must be **looped to the video length**, not played once (`-stream_loop -1`). A 10 s track on a 28 s video otherwise leaves 18 s of silence.
+- If the video is a beat-driven piece, derive the beat grid from the music instead of guessing: a tempo estimate plus the scene-change times is enough to snap transitions to the pulse. Keep it subtle — the narration leads, the beat supports.
+
+Tempo from the music itself — onset strength, then the median gap between onsets:
+
+```python
+import wave, numpy as np
+w = wave.open("audio/music.wav"); sr = w.getframerate()
+a = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
+hop = int(sr * 0.01)                                  # 10 ms resolution
+env = np.array([np.abs(a[i:i+hop]).max() for i in range(0, len(a) - hop, hop)])
+d = np.diff(env)
+peaks = [i for i in range(1, len(d)) if d[i] > 0.15 and d[i] >= d[i - 1]]
+onsets, last = [], None
+for p in peaks:                                       # collapse a hit into one onset
+    if last is None or p - last > 10:
+        onsets.append(p); last = p
+gap = np.median(np.diff(onsets)) * 0.01               # seconds per beat
+bpm, beat = 60 / gap, gap
+```
+
+Measured on a synthetic 120 BPM click: median gap 0.500 s → 120 BPM, 31 onsets over 16 s. Treat the result as a grid to snap optional accents onto, never as a requirement that scenes start on beats.
 
 If the user has no music: build simple background music that fits the visual style (`RENDER.md` §8) and say plainly that it is synthesised music. Alternatively render silent and suggest the user add royalty-free music.
