@@ -38,7 +38,7 @@ Catatan: jaringan lingkungan kerja bisa dibatasi. Cek dulu apa yang bisa diakses
 
 **Katalog ini titik awal, bukan menu.** Kalau topik butuh tipografi yang tidak ada di sini, unduh sendiri (lihat sub-bagian berikut). Memakai font terpasang hanya karena tersedia adalah cara tercepat membuat semua video terasa sama.
 
-Cek cepat: `fc-list | grep -iE "poppins|fredoka|caveat"` — kalau kosong, font belum terpasang (lihat troubleshooting bagian 6).
+Cek cepat: `fc-list | grep -iE "poppins|fredoka|caveat"` — kalau kosong, font belum terpasang (lihat §9 kalau penyebabnya tidak jelas).
 
 Pilih sesuai mood video; satu video maksimal 2–3 family (satu display + satu pendukung, plus handwriting kalau perlu aksen):
 
@@ -224,13 +224,13 @@ PY
 
 Pilih voice sesuai topik. Beberapa voice yang bagus untuk narasi: `Kore` (tegas), `Puck` (ceria/upbeat), `Charon` (informatif), `Zephyr` (terang), `Leda` (muda/wanita). Tersedia 30 voice prebuilt (termasuk `Orus`, `Aoede`, `Enceladus`, dll — docs lama yang bilang tidak ada sudah basi). Nama voice case-sensitive. Kalau ragu, probe satu request dengan teks pendek. Sebutkan ke user voice apa yang dipakai. Hasilnya langsung masuk pipeline bagian 3 seperti rekaman user.
 
-**Sanity check setelah generate.** Bandingkan durasi hasil dengan perkiraan naskah (±2,2 kata/detik untuk Bahasa Indonesia; ambang ±35%). Selisih jauh lebih besar biasanya berarti ada teks non-naskah yang ikut dibacakan (instruksi, label `[Hook]`, placeholder) atau naskah terpotong: periksa `vo_req.json` — `text` harus berisi verbatim naskah saja — lalu regenerate sekali. Kalau tetap tidak masuk akal, beri tahu user sebelum lanjut ke timeline.
+**Sanity check setelah generate.** Bandingkan durasi hasil dengan perkiraan naskah (patokan ±2,5 kata/detik untuk Bahasa Indonesia, ambang ±35%). Selisih jauh lebih besar biasanya berarti ada teks non-naskah yang ikut dibacakan (instruksi, label `[Hook]`, placeholder) atau naskah terpotong: periksa `vo_req.json` — `text` harus berisi verbatim naskah saja — lalu regenerate sekali. Kalau tetap tidak masuk akal, beri tahu user sebelum lanjut ke timeline.
 
 **Mode opsional untuk timing presisi (per-frasa).** Kalau tipografi kinetik per kata sangat penting: pecah naskah jadi frasa, generate satu request per frasa, ukur tiap file dengan `ffprobe` sehingga batas waktu tiap frasa eksak, lalu gabungkan berurutan menjadi satu `Suara Voiceover.wav` (file teks concat + `ffmpeg -f concat -i list.txt -c copy` atau re-encode ke WAV). Trade-off: kuota free tier per model cuma 10 request/hari (terhitung per model, per project) — naskah panjang tidak realistis dipecah per frasa di free tier. Default tetap satu file utuh.
 
 Batas kuota free tier TTS: sekitar **10 request/hari per model** (bukan per menit). Kalau dapat HTTP 429 `RESOURCE_EXHAUSTED`, cek pesannya: kalau limit harian, jangan diulang hari itu — langsung fallback ke `gemini-3.8-flash-lite-tts` (model terpisah, kuota harian terpisah), sebutkan ke user kalau pakai fallback. Kalau kedua model habis, lanjut opsi 2 di bawah.
 
-2. **Tanpa API key / gagal**: jangan mengarang suara. Sarankan user membuat suara dari naskah dan memberikan file hasilnya (upload atau path). Kalau user minta draf tanpa suara, timing perkiraan boleh dihitung dari jumlah kata (sekitar 2,5 kata per detik), dengan label draf dan batas total tetap 60 detik.
+2. **Tanpa API key / gagal**: jangan mengarang suara. Sarankan user membuat suara dari naskah dan memberikan file hasilnya (upload atau path). Kalau user minta draf tanpa suara, timing perkiraan boleh dihitung dari jumlah kata (sekitar 2,5 kata per detik), dengan label draf dan tetap menghormati `MAX_DUR`.
 
 ## 4. Menganalisis video referensi
 
@@ -259,7 +259,7 @@ Kalau user tidak memberi file/URL referensi (atau memilih "serahkan ke AI"), car
    yt-dlp "<url-pin>" -o "Referensi - Motion Graphic.mp4"
    ```
 
-3. Saring sebelum dipakai — cek dengan `ffprobe`, buang kandidat yang: durasi < 5 detik atau > 90 detik, resolusi di bawah 720p, tidak punya stream video, atau isinya tidak berhubungan dengan topik. Kandidat gugur → lanjut ke berikutnya.
+3. Saring sebelum dipakai — cek dengan `ffprobe`, buang kandidat yang: durasi < 5 detik atau > 90 detik, resolusi di bawah resolusi output yang direncanakan, tidak punya stream video, atau isinya tidak berhubungan dengan topik. Kandidat gugur → lanjut ke berikutnya.
 4. Semua kandidat gagal → jangan mati-matian. Katakan pada user, lalu tanya: user carikan file/URL-nya sendiri, atau user beri arahan gaya singkat (palet, font, mood) untuk lanjut tanpa referensi. Tidak ada gaya bawaan — jangan melanjutkan tanpa acuan gaya.
 
 Kualitas hasil cari sendiri tidak terkontrol. Wajib: sebut ke user video referensi apa yang terpilih (URL dan alasan singkat) sebelum masuk analisis, dan jadikan inspirasi bukan cetakan sesuai aturan di atas.
@@ -268,7 +268,7 @@ Kualitas hasil cari sendiri tidak terkontrol. Wajib: sebut ke user video referen
 
 - Tulis satu fungsi `render(t)` yang menggambar seluruh frame dari waktu saja, tanpa state tersembunyi atau angka acak yang berubah tiap panggilan (pakai seed tetap).
 - Definisikan fungsi easing (ease-out, ease-in-out, overshoot) dan pakai di semua animasi. Hindari gerak linear kecuali memang disengaja.
-- **Kewajiban gerak (gerbang QC, bukan pilihan):** di SETIAP detik video ada minimal satu elemen yang bergerak. Tidak boleh ada slide statis. Jika scene "diam", pakai kamera mikro: zoom drift ±2–4% atau geser ±10–20 px sepanjang scene. Kata kunci dan angka penting (mis. "92 juta") wajib diberi penekanan gerak tepat saat kata diucapkan — besar dan bentuk penekanannya keputusan rasa (pop skala, warna, bobot, posisi, atau kombinasi), dan skala WAJIB decay kembali ke 100% sebelum pop berikutnya — nilai overshoot yang menetap (mis. kata terus memakai skala 120%) membuat kata menimpa tetangganya. Slot lebar tiap kata diukur dengan font yang benar-benar dipakai (keyword ≠ body), dan kata yang muncul dua kali dalam satu scene punya waktu masing-masing — jangan dipetakan lewat dict per kata. Catatan desain idle motion: gerak POSISI elemen (geser x/y), bukan cuma perubahan radius/skala — lingkaran solid tanpa antialias yang hanya berdenyut radius sering tidak mengubah satu piksel pun; dan ukurannya minimal radius ±14 px / amplitudo ±10 px, kalau lebih kecil encoder (CRF 18+) bisa meng-quantize gerakan itu sampai hilang (lihat §9).
+- **Kewajiban gerak (gerbang QC, bukan pilihan):** di SETIAP detik video ada minimal satu elemen yang bergerak. Tidak boleh ada slide statis. Jika scene "diam", pakai kamera mikro (zoom drift atau geser halus sepanjang scene). Kata kunci dan angka penting (mis. "92 juta") wajib diberi penekanan gerak tepat saat kata diucapkan — besar dan bentuk penekanannya keputusan rasa (pop skala, warna, bobot, posisi, atau kombinasi), dan skala WAJIB decay kembali ke 100% sebelum pop berikutnya — nilai overshoot yang menetap (mis. kata terus memakai skala 120%) membuat kata menimpa tetangganya. Slot lebar tiap kata diukur dengan font yang benar-benar dipakai (keyword ≠ body), dan kata yang muncul dua kali dalam satu scene punya waktu masing-masing — jangan dipetakan lewat dict per kata. Catatan encoder: gerak POSISI elemen (geser x/y) lebih andal daripada perubahan radius/skala saja — lingkaran solid tanpa antialias yang hanya berdenyut radius sering tidak mengubah satu piksel pun, dan gerakan di bawah ±10 px bisa ter-quantize hilang di CRF 18+ (lihat §9).
 - Rumus easing siap pakai (boleh dipakai, boleh diganti rumus lain sesuai rasa): `easeOutCubic(u) = 1-(1-u)**3`; `easeInOutCubic(u) = u<0.5 ? 4*u**3 : 1-((-2*u+2)**3)/2`; overshoot/back-out: `1 + 2.7*(u-1)**3 + 1.7*(u-1)**2`.
 
   **Tidak ada angka durasi atau overshoot yang diwajibkan.** Durasi masuk, besar overshoot, dan ritme adalah keputusan rasa — pilih yang cocok dengan tempo narasi dan mood referensi. Yang wajib hanyalah invarian berikut, karena kalau dilanggar hasilnya rusak, bukan cuma berbeda rasa:
@@ -435,8 +435,9 @@ def iou(a, b):
 
 assert iou(bb_a, bb_b) < 0.16
 
-# 3) kontras: rasio WCAG terhadap warna yang benar-benar di belakang teks
-assert ratio(fill, bg_color) >= (3.0 if size >= 32 else 4.5), f"kontras kurang: {s}"
+# 3) kontras: rasio WCAG, ambang diikat ke PERAN teks (GUIDE.md §2),
+#    bukan ke ukuran px — teks kecil yang bergerak terbaca lebih buruk
+assert ratio(fill, bg_color) >= (3.0 if is_main else 4.5), f"kontras kurang: {s}"
 ```
 
 **Gerbang kontras** memakai rumus WCAG yang sama dengan `GUIDE.md` §2. Terukur pada palet yang sering dipakai: pasangan tinta-di-krem dan krem-di-gelap lolos jauh di atas 4,5:1, tapi aksen salmon muda di atas krem hanya **1,85:1** — gagal telak untuk teks apa pun. Kalau gerbang ini menolak, jangan turunkan ambangnya: ganti warnanya, atau taruh teks itu di latar gelap, atau beri panel solid di belakang.
@@ -493,7 +494,7 @@ ffmpeg -ss $(awk -v d="$DUR" 'BEGIN{print d-0.1}') -i output.mp4 -frames:v 1 che
 
 ## 8. Musik latar buatan sendiri
 
-Hanya kalau user tidak menyediakan musik. Buat pad ambient sederhana dengan numpy atau `aevalsrc`/`sine` dari ffmpeg: beberapa nada akor yang bertumpuk dengan volume pelan, ditambah denyut ringan di tempo yang pas dengan ritme visual (misalnya 100–120 BPM) bila ingin aksen beat. Ekspor sebagai WAV 48 kHz, lalu masukkan ke mix di atas.
+Hanya kalau user tidak menyediakan musik. Buat pad ambient sederhana dengan numpy atau `aevalsrc`/`sine` dari ffmpeg: beberapa nada akor bertumpuk dengan volume pelan, ditambah denyut ringan yang **tempo-nya cocok dengan ritme visual** (pilih sendiri; kalau ingin aksen beat, sejajarkan dengan pergantian scene). Ekspor sebagai WAV 48 kHz, lalu masukkan ke mix di atas.
 
 Katakan terus terang ke user bahwa ini musik sintetis sederhana, bukan komposisi profesional, dan sarankan musik bebas royalti bila ingin hasil lebih kaya.
 
@@ -524,4 +525,4 @@ Pakai maksimal beberapa kali per video, volumenya selalu di bawah voiceover, dan
 
 ## 10. Bersih-bersih setelah serah terima
 
-`frames/`, `ref/`, `check/`, `vo.json`, dan `vo.pcm` bisa gigabyte-an dan tidak dibutuhkan user. Setelah MP4 terverifikasi dan diserahkan, hapus semua itu; simpan hanya MP4 + kode sumber render (dan aset user) di project dir. Sebutkan di pesan serah terima kalau file perantara sudah dibersihkan.
+`frames/`, `ref/`, `check/`, `vo.json`, dan `vo.pcm` bisa gigabyte-an dan tidak dibutuhkan user. Setelah MP4 terverifikasi dan diserahkan, hapus semua itu; simpan hanya MP4 + kode sumber render (dan aset user) di folder proyek. Sebutkan di pesan serah terima kalau file perantara sudah dibersihkan.

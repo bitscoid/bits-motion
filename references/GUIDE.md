@@ -36,7 +36,7 @@ Aturan:
 - Pecah teks jadi frasa pendek. Jangan menampilkan satu paragraf utuh sekaligus. Sorot hanya kata kunci.
 - Pisahkan jelas tingkatan: judul, kata kunci, teks pendukung, label kecil.
 - Hindari huruf besar acak, font yang sulit dibaca, dan dekorasi berlebihan.
-- Jaga safe area: elemen penting minimal ±4% dari tepi frame. Angka ini satu-satunya angka (gerbang geometri di `RENDER.md` §7 memakai 4%); jangan pakai nilai lain supaya tidak ada dua kebenaran.
+- Jaga safe area: elemen penting minimal ±4% dari tepi frame. Pakai angka ini, jangan nilai lain, supaya tidak ada dua kebenaran (gerbang geometri di `RENDER.md` §7 memakai 4%).
 - Ukuran teks terkecil tetap terbaca di resolusi output. **Ambangnya tinggi glyph, bukan ukuran font** — glyph kapital hanya sekitar 0,75× ukuran font, jadi `truetype(size=100)` menghasilkan glyph ±75 px. Ukur dengan `textbbox`, jangan dari angka `size`. Dua tingkat:
   - **teks utama / kata kunci**: tinggi glyph ≥ 4% tinggi frame (1920 → 77 px; berarti font ≈ 102 px).
   - **teks pendukung / label / chip kecil**: tinggi glyph ≥ 2,5% tinggi frame (1920 → 48 px; font ≈ 64 px), dan wajib lolos kontras 4,5:1 karena ukurannya kecil.
@@ -76,7 +76,9 @@ d.text((px - dx, py - dy), s, font=f, anchor="mm", fill=fill)
 
 ## 3. Menganimasikan aset
 
-Aset penting jangan dibiarkan diam kecuali memang ada momen jeda yang disengaja. Ini kewajiban, bukan pilihan: di setiap scene minimal satu elemen bergerak setiap saat; kalau tidak ada yang wajar bergerak, pakai gerak kamera mikro (zoom drift ±2–4% atau geser ±10–20 px). Video motion graphic yang statis di scene mana pun dianggap gagal QC (gerbang freezedetect ada di `RENDER.md` §7).
+Aset penting jangan dibiarkan diam kecuali memang ada momen jeda yang disengaja. Ini kewajiban, bukan pilihan: di setiap scene minimal satu elemen bergerak setiap saat; kalau tidak ada yang wajar bergerak, pakai gerak kamera mikro (zoom drift atau geser halus sepanjang scene). Video motion graphic yang statis di scene mana pun dianggap gagal QC (gerbang freezedetect ada di `RENDER.md` §7).
+
+Batas bawahnya bukan selera, tapi encoder: gerakan yang terlalu kecil (radius <15 px, geser <10 px) bisa ter-quantize hilang di CRF 18+ sehingga frame jadi identik. Ukur gerakannya, jangan dikira.
 
 Teknik: scale in/out, gerak terarah dan rotasi halus, parallax dan lapisan kedalaman, reveal dengan mask, zoom kamera terkontrol, cropping kreatif, gerak melayang dan gerak sekunder, motion blur dan bayangan lembut, serta hubungan visual antara aset dan teks.
 
@@ -92,7 +94,7 @@ Pilihan: match cut, whip, wipe terarah, reveal dengan mask, transisi bentuk, tra
 
 Ini pilihan, bukan daftar centang. Pilih yang cocok dengan isi dan jaga kesatuan gaya. Sebisa mungkin hubungkan elemen visual antar scene supaya tidak terasa terputus.
 
-Ritme ditentukan isi, bukan angka. Patokan "scene inti ±2–6 detik" hanya deskripsi video pendek pada umumnya — kalau sebuah ide butuh 8 detik untuk mendarat, beri 8 detik. Yang tetap dijaga: variasi terbesar ditaruh di pembuka, dan scene di sepertiga akhir jangan terlalu pendek sampai penonton tidak sempat mencerna.
+Ritme ditentukan isi, bukan angka. Patokan "scene inti beberapa detik" hanya deskripsi video pendek pada umumnya — kalau sebuah ide butuh 8 detik untuk mendarat, beri 8 detik. Yang tetap dijaga: variasi terbesar ditaruh di pembuka, dan scene di sepertiga akhir jangan terlalu pendek sampai penonton tidak sempat mencerna.
 
 Hindari glitch berlebihan, putaran acak, kilatan tanpa alasan, dan transisi yang menutupi penjelasan. Semua transisi harus muat di dalam durasi total yang sudah dihitung. Durasi video tidak boleh melar karena transisi.
 
@@ -131,7 +133,7 @@ Video pendek dengan belasan scene mudah jatuh jadi "slide yang sama, kata berbed
 - **Variasikan skala**: satu scene dengan elemen raksasa yang memotong frame akan membuat scene lain terasa lapang, meski ukurannya biasa.
 - **Jaga satu hal tetap**: satu warna aksen, satu font display, satu jenis gerak dominan. Yang tetap itulah yang membuat variasi terasa disengaja, bukan acak.
 
-Periksa hasilnya dengan contact sheet (`ffmpeg ... tile`) sebelum ekspor: kalau 14 thumbnail terlihat seperti template yang sama, variasinya belum cukup.
+Periksa hasilnya dengan contact sheet (`ffmpeg ... tile`) sebelum ekspor: kalau semua thumbnail terlihat seperti template yang sama, variasinya belum cukup.
 
 ## 7. Sinkronisasi dengan voiceover
 

@@ -30,10 +30,10 @@ Begitu durasi total dihitung di Tahap 4, angka itu menjadi target pasti untuk re
 
 ## Aturan vs selera
 
-File ini mengatur **akurasi**, bukan **rupa**. Bedanya: aturan bisa dicek skrip, selera tidak.
+File ini mengatur **akurasi**, bukan **rupa**. Bedanya: akurasi bisa dibuktikan dengan angka, selera tidak.
 
 Dua syarat, bukan satu. Kebijakan baru hanya masuk kalau **keduanya** benar:
-1. **bisa dicek skrip**, dan
+1. **bisa dibuktikan** dengan pengukuran (angka, metadata file, atau pemeriksaan yang bisa diulang), dan
 2. **tidak membuat pilihan kreatif jadi mustahil**.
 
 Aturan yang lolos (1) tapi gagal (2) itu perampasan, bukan standar. Contoh yang gagal: "overshoot easing 1,16", "hook wajib 3 detik", "scene 2–6 detik", "palet harus krem".
@@ -49,7 +49,7 @@ Kalau kelak ada proyek contoh di `references/examples/`: wajib **berpasangan den
 
 Satu pengecualian yang sering disalahpahami: teks layar **tidak wajib** punya kata pendukung di voiceover. Kalau kamu menaruh penekanan senyap, itu sah — cukup catat alasannya di timeline.
 
-**Gerbang QC menandai, tidak menghakimi.** Kalau sebuah fungsi QC melaporkan temuan, tugasmu memutuskan: cacat yang harus diperbaiki, atau pilihan yang disengaja dan perlu dicatat. Lulus semua gerbang berarti "tidak cacat", bukan "bagus".
+**Gerbang QC menandai, tidak menghakimi.** Kalau sebuah pemeriksaan melaporkan temuan, tugasmu memutuskan: cacat yang harus diperbaiki, atau pilihan yang disengaja dan perlu dicatat. Lulus semua gerbang berarti "tidak cacat", bukan "bagus".
 
 ## Alur kerja
 
@@ -136,7 +136,7 @@ Ritme dibuat bervariasi: pembuka yang langsung menarik perhatian, bagian tengah 
 
 Baca dua file referensi sebelum membangun apa pun:
 - `references/GUIDE.md` untuk arah kreatif, tipografi, animasi aset, transisi, **menerjemahkan ide jadi visual (§5), variasi komposisi antar scene (§6)**, dan mixing audio.
-- `references/RENDER.md` untuk cek lingkungan, pipeline render, perintah ffmpeg, dan cara verifikasi.
+- `references/RENDER.md` untuk cek lingkungan, font, pipeline render, perintah ffmpeg, dan cara verifikasi.
 
 Pemeriksaan QC **kamu tulis sendiri** saat dibutuhkan. Aturannya sudah lengkap dalam prosa: safe area, tinggi glyph dua tingkat, kontras WCAG, tabrakan teks (IoU), dan pola berulang — semuanya di `GUIDE.md` §2 dan `RENDER.md` §7. Terjemahkan ke kode sesuai renderer yang kamu pakai. Jangan cari perpustakaan bersama; tiap proyek punya struktur data sendiri, dan aturan yang jelas cukup dibaca.
 
@@ -153,7 +153,7 @@ Periksa file MP4 hasil ekspor dari awal sampai akhir, bukan hanya timeline edito
 5. Musik mendukung dan suara tetap dominan.
 6. Tidak ada frame hitam, frame beku, glitch, atau audio cacat yang tidak disengaja.
 7. MP4 bisa diputar. Durasi aktual sama dengan durasi total yang dihitung di Tahap 4 (tidak melebihi batas yang berlaku), jumlah frame = durasi × 30, 30 fps, codec dan resolusi sesuai spesifikasi, tidak ada konten setelah detik terakhir, dan batas durasi yang dipakai disebutkan (default 60 detik atau angka yang user setujui). Semuanya dibuktikan dari metadata file hasil ekspor.
-8. Tiga gerbang di `references/RENDER.md` §7 lulus: sinkron (tidak ada teks yang muncul sebelum katanya), geometri (safe area, keterbacaan ukuran, tabrakan, kontras), dan ekor audio (tidak ada keheningan tak sengaja sampai detik terakhir). Gerbang keempat (pola berulang) hanya menandai, keputusanmu. Buktikan hasilnya dengan angka, sebutkan di pesan serah terima.
+8. Gerbang di `references/RENDER.md` §7 lulus: sinkron (tidak ada teks yang muncul sebelum katanya), geometri (safe area, keterbacaan ukuran, tabrakan, kontras), ekor audio (tidak ada keheningan tak sengaja sampai detik terakhir), dan pola berulang (hanya menandai, keputusanmu). Buktikan hasilnya dengan angka, sebutkan di pesan serah terima.
 
 Cek kreatifnya juga, tapi dengan mata, bukan skrip: buka contact sheet hasil ekspor (`ffmpeg -i output.mp4 -vf "fps=1,scale=300:-1,tile=6x8" sheet.png`). Kalau semua thumbnail terlihat seperti satu template dengan kata berbeda, variasi komposisi belum cukup (`GUIDE.md` §6) — perbaiki sebelum serah terima.
 
