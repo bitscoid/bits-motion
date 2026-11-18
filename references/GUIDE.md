@@ -35,7 +35,7 @@ Rules:
 
   **The font catalogue is not a menu.** The list in `RENDER.md` §"Fonts ready to use" is what happens to be installed, not the set of allowed choices. Your job is to pick typography that **fits the topic and the reference mood**, not the first row of the table. If the topic needs something missing (a food topic wanting a fat slab serif, an archive topic wanting a heavy condensed face, a tech topic wanting a narrow grotesk), **download it** — never settle for "close enough" just because it's installed. The download recipe and verification are in `RENDER.md` §1.
 
-  The practical limit is coherence, not a count: **2–3 families is the range that usually holds together** as one system. More than that rarely does — but if a concept genuinely needs a fourth voice, that is a design decision, not a violation. Verify with `fc-list` or `fc-query` before using it in a scene.
+  The practical limit is coherence, not a count: **2–3 families is the range that usually holds together** as one system.
 - Preserve spelling and meaning exactly as scripted.
 - Keep on-screen copy short: a whole paragraph at once rarely reads on video. Highlighting keywords is the usual way to give the eye a path through a line; a line that needs every word emphasised has no emphasis at all.
 - Keep clear levels: title, keyword, supporting line, small label.
@@ -44,7 +44,7 @@ Rules:
   - **the display face, usually italic**, when the caption reads as a phrase or a sentence rather than a bare label.
 
   The risk worth a decision: a single sentence-case sans line left alone among caps labels starts reading as a tooltip or a settings note — the interface voice of the face showing through. That is a reason to choose deliberately, not a ban.
-  **Two families — display + meta — is a reliable system for most videos.** The display face carries spoken content and emphasis (titles, claims, keywords, stamps, verdict badges); the meta face carries labels, indices, chips, captions and footnotes. Which face carries the meta voice is a per-topic decision: a mono (e.g. `JetBrains Mono`) fits tech and data, a serif italic or small-caps serif fits editorial or historical topics, handwriting can carry annotation when the topic is personal. A third family earns its place when it has a distinct job — and any system here has to keep re-asking "does this face fit *this* topic?", because mono everywhere is what this paragraph becomes if nobody does.
+  **A display face plus a meta face is a reliable system for most videos.** The display face carries spoken content and emphasis (titles, claims, keywords, stamps, verdict badges); the meta face carries labels, indices, chips, captions and footnotes. Which face carries the meta voice is a per-topic decision: a mono (e.g. `JetBrains Mono`) fits tech and data, a serif italic or small-caps serif fits editorial or historical topics, handwriting can carry annotation when the topic is personal.
 - **Case is a design decision, not a rule.** Spoken content — a claim, a quote, a sentence the narration also says — keeps its natural case and punctuation in whatever face it uses, and setting a project's plain voice in sentence-case sans is legitimate.
 - **Uppercasing a claim changes who appears to say it.** Caps read as the video's own assertion, so a myth, a quote or a reported claim set in caps can look endorsed. If the design wants caps there, check that the meaning survives; proper nouns keep their spelling either way.
 - **Caps usually want tracking.** Without it, an uppercase line reads as a form rather than a label. Keep the line short, and measure the **cap height** — not the full ascender-to-descender box, which adds descenders and makes a lowercase-only line look far smaller than its caps — against the size tier. Uppercase lines are uniform height, so the size that clears 2.5% in mixed case will usually not clear it in caps.
@@ -63,7 +63,7 @@ Rules:
 
   Writing only the 1920 figures is what makes a landscape video ship with text half the intended size. Measure the result; don't estimate.
 
-  Measure the **cap height**, not the full string box. Mixed case adds descenders, and a lowercase-only line returns x-height — about 0.58× the size on DejaVu Sans Bold, against 0.73× for capitals — so a gate fed `textbbox` height would demand type roughly 25% larger than this table intends, and would fail a correctly sized word like "sun". Measure a reference capital (`font.getbbox("H")`) once per face, or the script's tallest glyph for non-Latin writing systems.
+  Measure the **cap height**, not the full string box. Mixed case adds descenders, and a lowercase-only line returns x-height — about 0.58× the size on DejaVu Sans Bold, against 0.73× for capitals — so a gate fed `textbbox` height would demand type roughly 25% larger than this table intends, and would fail a correctly sized word like "sun". Measure `font.getbbox("H")` once per face.
 
   If a supporting line will not fit at 2.5% alongside other elements, cut words from that line — never lower the threshold.
 - Check text-against-background contrast in code, never by judging colour names. Thresholds are measurable and tied to the text's **role**, not its pixel size:

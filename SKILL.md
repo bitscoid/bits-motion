@@ -434,16 +434,7 @@ Inspect the exported MP4 from start to finish, not just the timeline editor:
 8. The measurements in `references/RENDER.md` §7 are run and reported: sync (no text appears before its word), geometry (safe area, cap height, collision, contrast), audio (no dead air inside the speech region; music present in the tail when music exists; mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP), and repetition pattern (flag only, your call). Two of them are hard requirements — frame contiguity before encoding, and the finished loudness and tail floor. The rest are advisory: report the numbers and the decision you made from them.
 9. `output/publish.txt` exists and every block in it is copy-paste ready — see *Publish copy* below. It is part of the deliverable, not an extra.
 
-Check the creative side with your eyes, not a script: open a contact sheet of the export sized from the actual duration. If the main model cannot see it, hand the sheet to the `vision` subagent — one call, *Vision routing*:
-
-```bash
-mkdir -p work/check
-CELLS=$(( (DUR + 2) / 3 ))                     # one thumbnail per 3 s
-SCALE=$(python3 -c "import math;print(max(1,int(math.ceil(math.sqrt($CELLS)))))")
-ffmpeg -i output/<slug>.mp4 -vf "fps=1/3,scale=240:-1,tile=${SCALE}x${SCALE}" -frames:v 1 work/check/sheet.png
-```
-
-`-frames:v 1` is required — a tile grid is one image, and without it the command fails on the second frame. Sizing the grid from `DUR` is what makes the sheet cover the whole video: a fixed `fps=1` in an 8×8 tile caps the sheet at the first ~64 s. For a 60 s portrait video `fps=1/3` gives 20 cells in a 5×5 grid; for 300 s, 100 cells in 10×10. If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
+Check the creative side with your eyes, not a script: open a contact sheet of the export sized from the actual duration — recipe and grid sizing in `references/RENDER.md` §7. If the main model cannot see it, hand the sheet to the `vision` subagent — one call, *Vision routing*. If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
 
 ### Publish copy — `output/publish.txt`
 

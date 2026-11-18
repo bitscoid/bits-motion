@@ -137,7 +137,7 @@ The lower bound is the encoder, not taste: motion under ~10 px can be quantised 
 
 Scenes with the same structural signature get flagged so you can decide: *deliberate motif* or *coincidence to fix*. The gate forces that decision to be written down; it never homogenises the output.
 
-Signatures compare ink against each frame's own modal luma, so a dark theme with light text works — the old `luma < 110` rule measured the background and returned an identical centroid for every scene.
+Signatures compare ink against each frame's own modal luma, so a dark theme with light text works — a fixed luma threshold measures the background instead and returns an identical centroid for every scene.
 
 </details>
 

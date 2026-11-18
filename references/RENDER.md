@@ -31,7 +31,7 @@ NC=$(timeout 8 curl -s -o /dev/null -w '%{http_code}' https://generativelanguage
 case "$NC" in 200|403|404) echo "network: OK (HTTP $NC)";; *) echo "network: PROBLEM (HTTP $NC / timeout)";; esac
 ```
 
-Network access is often restricted. Check what actually works: if `pip` runs, `pip install skia-python` is the one dependency worth adding; extra fonts come from the Google Fonts route in §1. If external downloads are blocked, use fonts already on the system. The ffmpeg version dictates which options are legal (see §6).
+Network access is often restricted. If external downloads are blocked, use fonts already on the system; extra fonts come from the Google Fonts route in §1. The ffmpeg version dictates which options are legal (see §6).
 
 ### Vision capability (measured, never assumed)
 
@@ -65,7 +65,7 @@ Batch several images into one delegated call. Timing, scene code, rendering, and
 
 Quick check: `fc-list | grep -iE "poppins|fredoka|caveat"` — empty means not installed (see *Adding a new font* below).
 
-Match to the video's mood; **2–3 families is the usual range** (one display + one supporting, plus handwriting if it needs an accent) — a working default, not a hard cap:
+Match to the video's mood (one display + one supporting usually covers it):
 
 | Mood / style | Fonts | Notes |
 |---|---|---|
@@ -78,7 +78,7 @@ Match to the video's mood; **2–3 families is the usual range** (one display + 
 | Technical / data / mono | `JetBrains Mono`, `Space Mono`, `Space Grotesk`, `IBM Plex Mono`, `Sora`, `Epilogue` | Small labels, statistics, data and tech feel |
 | Expressive / display | `Bricolage Grotesque`, `Shrikhand`, `Unbounded`, `Syne` | Titles that carry personality — use once per video, never for body |
 
-Mix across categories freely. **2–3 families is the range that usually reads as one system**; more rarely does, but a concept that needs a fourth voice is a decision to make, not a rule breaking. The catalogue exists to widen the range of moods available, not to prescribe which one to pick.
+Mix across categories freely. The catalogue widens the range of moods available; it does not prescribe which one to pick.
 
 Usage: in PIL pass the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`). Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file; call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
 
@@ -487,7 +487,7 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
 
 - Write one `render(t)` function that draws the whole frame from time alone, with no hidden state and no randomness that changes between calls (use a fixed seed).
 - Define easing functions (ease-out, ease-in-out, overshoot) and use them throughout. Avoid constant speed unless it is deliberate.
-- **Motion is what the encoder can see.** Every second needs at least one element whose **position** actually changes — an idle element can drift or pan instead of pulsing. This is an encoding requirement, not a ban on held frames: a documented hold is a legitimate edit (`GUIDE.md` §3). Keywords and important figures (e.g. "92 juta") take a motion emphasis as the word is spoken — the amount and form is taste (scale pop, colour, weight, position, or a combination). If two words share a line, a scale pop must decay back to 100% before the next one, or they collide; a keyword that owns its frame may hold its scale. Measure each word's width slot with the font actually used (keyword ≠ body); a word appearing twice in one scene needs its own time for each appearance — never map both through one dict entry. Encoder note: element POSITION motion (x/y shift) is more reliable than radius/scale alone — a solid antialias-free circle that merely pulses in radius often changes not a single pixel, and motion under ~10 px can be quantised away at CRF 18+ (§9).
+- **Motion is what the encoder can see.** Every second needs at least one element whose **position** actually changes — an idle element can drift or pan instead of pulsing. This is an encoding requirement, not a ban on held frames: a documented hold is a legitimate edit (`GUIDE.md` §3). Keywords and important figures (e.g. "92 juta") take a motion emphasis as the word is spoken — the amount and form is taste (scale pop, colour, weight, position, or a combination). If two words share a line, a scale pop must decay back to 100% before the next one, or they collide; a keyword that owns its frame may hold its scale. Measure each word's width slot with the font actually used (keyword ≠ body); a word appearing twice in one scene needs its own time for each appearance — never map both through one dict entry. Encoder note: element POSITION motion (x/y shift) is more reliable than radius/scale alone — a solid antialias-free circle that merely pulses in radius often changes not a single pixel, and motion under ~10 px can be quantised away at CRF 18+.
 - Easing formulas you may use or replace with whatever suits the feel: `easeOutCubic(u) = 1-(1-u)**3`; `easeInOutCubic(u) = u<0.5 ? 4*u**3 : 1-((-2*u+2)**3)/2`; overshoot/back-out: `1 + 2.7*(u-1)**3 + 1.7*(u-1)**2`.
 
   **No duration or overshoot figure is mandatory.** Entry duration, overshoot size, and rhythm are taste decisions — pick what matches the narration pace and reference mood. Only these invariants are required, because breaking them breaks the result rather than merely changing the feel:
@@ -564,7 +564,7 @@ missing = [i for i in range(FRAMES) if not os.path.exists(f"work/frames/{i:05d}.
 assert not missing, f"{len(missing)} frames missing, first: {missing[:3]}"
 ```
 
-**Three steps — never merged into one `filter_complex`.** Combining `loudnorm` with `apad` in one chain kills the audio tail: loudnorm also processes the padding, dropping the tail to −91 dB (measured on the single-chain example that used to be here: `silence_start 40.86` in a 43 s video). So split:
+**Three steps — never merged into one `filter_complex`.** Combining `loudnorm` with `apad` in one chain kills the audio tail: loudnorm also processes the padding, dropping the tail to −91 dB (measured: `silence_start 40.86` in a 43 s video). So split:
 
 ```bash
 # 1) normalise the voiceover into its own file
@@ -594,7 +594,7 @@ ffmpeg -y -framerate 30 -start_number 0 -i work/frames/%05d.png \
   -movflags +faststart "output/<slug>.mp4"
 ```
 
-`FADE_ST` derives from video duration, not music duration: `DUR - 2.5` (the `awk` recipe above already does this). The fade ends near the final second but must not reach absolute zero — measured, the old `afade=t=out:st=DUR-2.5:d=2.5` ended exactly at zero and left the last **0.8 s at −61.7 dB**, which the gate treats as dead air. The expression above fades to a −32 dB floor instead; measured last-0.5-s level **−45 dB with music echoing the tail**, which passes. `-ac 2` matters because a mono voiceover otherwise exports a mono AAC track; measured `channels=1` without it, `channels=2` with it.
+`FADE_ST` derives from video duration, not music duration: `DUR - 2.5` (the `awk` recipe above already does this). The fade ends near the final second but must not reach absolute zero — `afade=t=out:st=DUR-2.5:d=2.5` ends exactly at zero and leaves the last **0.8 s at −61.7 dB**, which the gate treats as dead air. The expression above fades to a −32 dB floor instead; measured last-0.5-s level **−45 dB with music echoing the tail**, which passes. `-ac 2` matters because a mono voiceover otherwise exports a mono AAC track; measured `channels=1` without it, `channels=2` with it.
 
 Notes:
 - `loudnorm` equalises voiceover loudness (target I=-16 LUFS, TP=-1.5) so user recordings and TTS results sit at the same level. It works internally at 192 kHz; `-ar 48000` in step 1 restores the sample rate.
@@ -639,7 +639,7 @@ ffmpeg -i output/<slug>.mp4 -af silencedetect=noise=-50dB:d=0.5 -vn -f null - 2>
 ffmpeg -i output/<slug>.mp4 -af volumedetect -vn -f null - 2>&1 | grep -E "mean_volume|max_volume"
 ```
 
-**Motion gate:** `freezedetect=n=0:d=1.0` should come back empty, apart from deliberate, timeline-documented rests. A freeze means the render is genuinely still — go back to §5, add micro camera motion or element animation, re-render. Report this gate result alongside the duration. The section below sets how many rests are worth an alert, not a pass/fail line.
+**Motion gate:** `freezedetect=n=0:d=1.0` should come back empty, apart from deliberate, timeline-documented rests. `n` is a linear 0–1 ratio, not a dB value — `n=-60dB` is not a legal argument, and the default `n=0.001` (about −60 dB) false-positives on flat graphics. A freeze means the render is genuinely still — go back to §5, add micro camera motion or element animation, re-render. Report this gate result alongside the duration. The section below sets how many rests are worth an alert, not a pass/fail line.
 
 How many rests are expected scales with length, because a five-minute explainer needs breathing room a 60-second clip does not. Treat the table as an **alert threshold, not a ceiling**: a deliberate hold — comedic timing, a punchline frame, a dramatic pause after a verdict — is a legitimate editing choice when it is written in the timeline with its reason. The gate's job is to count rests and list their positions so a human judges intent; it must never fail a video for holding a frame on purpose. What stays forbidden is the *undocumented* freeze: a scene stalled because nothing was animated.
 
@@ -682,8 +682,6 @@ fi
 Verified on real builds: a music track that stops 1 s early reads **−61.7 dB** in the last half second and fails; the same video with music carried to the end reads **−45 dB** and passes; a 0.8 s hole inside narration is caught by check 1; a video with no music passes both because the silent tail is expected.
 
 `silence_start` prints the time as the last field, so use `$NF` — the logger prefix `[silencedetect @ 0x…]` shifts every other column.
-
-The historical −91 dB tail (from `loudnorm` inline with `apad`) is still the most common cause of check 2 failing when music is present. Normalise the voiceover into its own file first, then mix (§6).
 
 **Loudness gate.** The voiceover is normalised, but the finished mix is not: quiet music leaves the whole file quiet, and every platform then re-normalises it inconsistently. Measure the export:
 
@@ -758,7 +756,7 @@ check(bb[1] > H * 0.04 and bb[3] < H * 0.96, f"crosses top/bottom safe area: {s}
 #     share one number: short side 1920 -> primary 77px, supporting 48px;
 #     short side 1080 -> primary 43px, supporting 27px.
 S = min(W, H)
-cap = f.getbbox("H")                  # non-Latin script: use its tallest reference glyph
+cap = f.getbbox("H")
 cap_h = cap[3] - cap[1]
 check(cap_h >= S * (0.04 if is_main else 0.025), f"text too small: {s} (cap {cap_h}px)")
 
@@ -846,10 +844,6 @@ Deliberate repetition is often good and always legitimate. What must surface is 
 
 The same text drawn twice at the same position (e.g. text over a highlight block) is IoU 1.0 — deliberate; exclude identical pairs. Run every gate before export, not after; re-rendering one scene is cheaper than re-rendering a video.
 
-Two things that make these gates mislead:
-- `freezedetect` with its default `n=0.001` (about −60 dB) FALSE POSITIVES on motion graphics: decoded frames inside the "frozen" range can change thousands of pixels per frame (idle elements, breathing dots) yet the filter still reports a freeze because the tolerance is too high for flat graphics. Always use `n=0`. Note that `n` is a linear 0–1 ratio, not a dB value — `n=-60dB` is not a legal argument.
-- Source frames move but the MP4 reports a freeze at the same point? That is the encoder: small elements (radius <15 px, motion <10 px/frame) in a large flat area can be quantised away at CRF 18+. Enlarge the idle element or drop CRF to 16 — do not add new motion.
-
 `max_volume` touching 0 dB means clipping risk — and if `alimiter` is installed yet max is still 0 dB, the cause is almost certainly its default `level` option (§9).
 
 Visual check: extract frames at key points (start, each scene change, end) and look for yourself at legibility, spelling, cropping, and collisions.
@@ -860,9 +854,7 @@ ffmpeg -i output/<slug>.mp4 -vf "fps=1/2,scale=640:-1" work/check/%02d.png
 ffmpeg -ss $(awk -v d="$DUR" 'BEGIN{print d-0.1}') -i output/<slug>.mp4 -frames:v 1 work/check/last.png
 ```
 
-The contact sheet needs `-frames:v 1`: a `tile` grid is one image, and without it ffmpeg tries to write that image once per input frame and dies at the second one (`Cannot write more than one file with the same name`, exit −22).
-
-The grid must also cover the whole video, and a landscape video can run 300 s. `fps=1` at `8x8` stops at 64 s, so a 5-minute video silently loses its last four minutes. Size both the interval and the grid from `DUR`:
+The grid must cover the whole video, and a landscape video can run 300 s. `fps=1` at `8x8` stops at 64 s, so a 5-minute video silently loses its last four minutes. Size both the interval and the grid from `DUR`:
 
 ```bash
 CELLS=$(( (DUR + 2) / 3 ))                       # one thumbnail per 3 s
@@ -906,7 +898,7 @@ Use at most a few per video, always below the voiceover level, and tell the user
 - **Mono output from a mono voiceover:** `-ac 2` on export. Measured `channels=1` without it; platforms accept mono but stereo costs nothing.
 - **`silencedetect` `$3` is not the timestamp.** The logger writes `[silencedetect @ 0x…] silence_start: 12.34`, so the time is the **last** field (`$NF`). Filtering on `$3` silently matches nothing and every gate appears to pass.
 - **`textbbox` with `anchor` is not the glyph shape:** treating bb[1]/bb[3] as symmetric around the anchor point is wrong for numerals and capital text. Always compute the bbox centre offset from the anchor before placing inside a shape (see `GUIDE.md` §2). Pass the **same anchor** you draw with: the box is in canvas coordinates either way (measured: drawing "92" at (200,100) returns (200,116,311,176) at the default anchor), so the safe-area comparison is valid — but bb[1] is offset from the draw point, which matters for centring.
-- **Glyph height taken from `textbbox` is not cap height:** mixed case adds descenders, and a lowercase-only line returns x-height. Measured on DejaVu Sans Bold at size 60: `"KATA"` = 44 px, `"sun"` = 35 px, against a 43 px threshold on a 1080 short side. Using `bb[3]-bb[1]` fails correct type (and passes small type). Measure `font.getbbox("H")` once per face, or the tallest reference glyph for non-Latin scripts.
+- **Glyph height taken from `textbbox` is not cap height:** mixed case adds descenders, and a lowercase-only line returns x-height. Measured on DejaVu Sans Bold at size 60: `"KATA"` = 44 px, `"sun"` = 35 px, against a 43 px threshold on a 1080 short side. Using `bb[3]-bb[1]` fails correct type (and passes small type). Measure `font.getbbox("H")` once per face.
 - **`blackdetect` default `pix_th=0.1` flags legitimate dark design:** a `0x0B0B0F` background (luma 0.043) is reported as black from `pix_th=0.05` upward; at `0.02` it is clean while true `0x000000` is still caught. Use `pix_th=0.02`.
 - **`tile` without `-frames:v 1`** writes the grid once per input frame and fails on the second (`Cannot write more than one file with the same name`, exit −22). Also make sure the tile grid has room: a fixed `8x8` at `fps=1` covers only 64 s, so a 300 s landscape video shows its first minute and silently drops the other four. Size interval and grid from `DUR` (§7).
 - **Missing frames mid-sequence truncate the encode:** `-i work/frames/%05d.png` stops at the first gap, and `-pattern_type glob` reorders but does not fill. Measured: a 5-file sequence with `00002.png` missing encoded 2 frames. Assert contiguity before encoding (§6).
@@ -917,7 +909,6 @@ Use at most a few per video, always below the voiceover level, and tell the user
 - **Chips and badges: build the box from the measured content, not the reverse:** box = padding + icon + gap + text width, the whole group centred on its anchor. Hand-placing the box and the text separately measured off-centre by tens of pixels. Also: a keyword inside a chip is a *badge*, not primary text — set it in the supporting tier (≥2.5% cap height), not the primary tier, or it dwarfs the card around it.
 - **ASR homographs break keyword lookup:** matching the word `jadi` by first occurrence grabbed an earlier sentence's token (and an empty ASR artifact split one word into two), silently collapsing a scene range and leaving an 11-second stretch drawing only the closing scene — which no pixel gate flagged as wrong. Index repeated words from the END (`occ=-1`) for closings/verdicts, and after building the timeline, assert scene ranges are increasing (`a < b` for every consecutive pair).
 - **Word-level width math is the collision gate's blind spot's twin:** the geometry gate only fires on the frames you sample. Run the coverage check on frames at *every* sentence midpoint, not just the sync-check moments, or an overlap that appears only while words are mid-pop stays invisible.
-- **Small idle elements quantised by the encoder:** dots/particles under ~15 px radius that merely pulse in a large flat area can vanish after encoding (CRF 18+), leaving identical decoded frames → a real freeze in the MP4 even though the renderer drew motion. Enlarge the element and move its position, not just its radius (a solid antialias-free circle changing radius often alters no pixel at all).
 
 ## 10. Cleanup after delivery
 
