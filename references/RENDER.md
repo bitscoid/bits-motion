@@ -466,7 +466,7 @@ assert iou(bb_a, bb_b) < 0.16
 assert ratio(fill, bg_color) >= (3.0 if is_main else 4.5), f"contrast too low: {s}"
 ```
 
-**Contrast gate** uses the same WCAG formula as `GUIDE.md` §2. Measured on palettes in common use: ink-on-cream and cream-on-dark pass well above 4.5:1, but a light salmon accent on cream reaches only **1.85:1** — a hard fail for any text; darkening that accent to `(166, 82, 70)` brings it to **4.56:1**, which passes for supporting text. When this gate rejects, do not lower the threshold: change the colour, move the text onto a dark background, or place a solid panel behind it.
+**Contrast gate** uses the same WCAG formula as `GUIDE.md` §2, with the threshold tied to the text's role: **3.0:1** for primary text, **4.5:1** for supporting text. Measured on palettes in common use: ink-on-cream and cream-on-dark pass well above 4.5:1, but a light salmon accent on cream reaches only **1.85:1** — a hard fail for any text; darkening that accent to `(166, 82, 70)` brings it to **4.56:1**, which passes for supporting text. When this gate rejects, do not lower the threshold: change the colour, move the text onto a dark background, or place a solid panel behind it.
 
 ### Third gate: repetition pattern (flags, never rejects)
 

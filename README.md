@@ -26,6 +26,8 @@ topic ──► script ──► voice ──► word timing ──► scenes �
 
 The output is an **MP4 (H.264 + AAC, 30 fps, constant frame rate)** whose length is derived from the voiceover — 60 seconds by default, longer only when you ask.
 
+Resolution follows the reference video's orientation. Without a reference it asks, and falls back to **1920×1080** landscape or **1080×1920** portrait.
+
 ---
 
 ## 🚀 Quick start
@@ -130,17 +132,23 @@ Each video becomes a self-contained folder:
 
 ```
 tiga-mitos-otak/
-├── script.txt              voiceover script, clean text
+├── script.txt              voiceover script, clean text, no labels
 ├── render.py               scenes, timing table, render(t)
 ├── audio/
-│   ├── voiceover.wav       48 kHz mono, timing source
-│   └── music.wav           optional
-├── assets/                 optional
-│   ├── image-01.png
-│   └── reference.mp4       style reference
+│   ├── voiceover.wav       timing source, 48 kHz mono
+│   └── music.wav           optional, 48 kHz
+├── assets/                 optional; created only when the user supplies assets
+│   ├── image-01.png        first supporting image
+│   ├── image-02.png        second supporting image
+│   └── reference.mp4       style reference video
 ├── output/
-│   └── tiga-mitos-otak.mp4 deliverable
-└── work/                   intermediates — safe to delete
+│   └── tiga-mitos-otak.mp4 deliverable; name equals folder name
+└── work/                   every intermediate file; safe to delete entirely
+    ├── frames/
+    ├── check/
+    ├── voiceover-16k.wav   16 kHz mono, for speech recognition
+    ├── voiceover-norm.wav  loudness-normalised voiceover
+    └── words.json          word-level timing output
 ```
 
 **Naming rule:** file and directory names are English kebab-case; file contents and every message to the user are Indonesian. The project folder and the video carry the topic slug so they stay meaningful in a file manager.
