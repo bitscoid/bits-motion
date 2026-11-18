@@ -41,14 +41,12 @@ Aturan:
   - **teks utama / kata kunci**: tinggi glyph ≥ 4% tinggi frame (1920 → 77 px; berarti font ≈ 102 px).
   - **teks pendukung / label / chip kecil**: tinggi glyph ≥ 2,5% tinggi frame (1920 → 48 px; font ≈ 64 px), dan wajib lolos kontras 4,5:1 karena ukurannya kecil.
 
-  Kalau baris pendukung tidak muat di tingkat 2,5% bersama elemen lain, kurangi jumlah kata di baris itu — jangan turunkan ambangnya.
-
-  Semua angka di atas (safe area, dua tingkat glyph, kontras) sudah tersedia sebagai fungsi siap pakai di `references/scripts/gates.py`. Pakai pustaka itu, jangan menulis ulang rumusnya di setiap proyek.
+  Kalau baris pendukung tidak muat di tingkat 2,5% bersama elemen lain, kurangi jumlah kata di baris itu — jangan turunkan ambangnya. Ukur hasilnya, jangan dikira.
 - Cek kontras teks vs latarnya di kode, jangan dikira dari nama warna. Ambangnya terukur dan diikat ke **peran teks**, bukan ukuran piksel:
   - **teks utama / kata kunci: 3,0:1**
   - **teks pendukung / label / chip: 4,5:1** — lebih ketat dari WCAG "large text", karena teks kecil yang bergerak cepat terbaca jauh lebih buruk daripada teks diam berukuran sama.
 
-  Hitung dengan rumus WCAG (atau pakai `references/scripts/gates.py`):
+  Hitung dengan rumus WCAG:
 
 ```python
 def lum(c):  # c = (r, g, b) 0-255

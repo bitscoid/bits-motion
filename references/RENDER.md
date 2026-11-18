@@ -375,20 +375,9 @@ Kalau musik tetap ingin punya fade-out, buat fade di file musiknya sendiri dan p
 
 Keduanya skrip, jalan di atas frame hasil render, dan menangkap kelas cacat yang tidak terlihat saat menonton sekali jalan.
 
-**Pakai pustaka siap pakai.** Safe area, dua tingkat tinggi glyph, tabrakan teks, kontras, dan pola berulang sudah ada di `references/scripts/gates.py`. Fungsi di sana mengembalikan daftar saran (string), bukan keputusan lulus/gagal — jadi tidak ada yang dipaksa seragam. Panggil dari skrip render proyek:
+**Tulis sendiri saat dibutuhkan.** Aturannya sudah lengkap dalam prosa di bawah dan di `GUIDE.md` §2: safe area 4%, tinggi glyph dua tingkat, kontras per peran, tabrakan IoU, pola berulang. Terjemahkan ke kode mengikuti struktur data renderer-mu.
 
-```python
-import sys; sys.path.insert(0, "…/bits-motion/references/scripts")
-from gates import safe_area, glyph_size, overlaps, contrast, repeated_pattern, report
-
-temuan = {"safe_area": [], "glyph": [], "overlap": [], "kontras": []}
-for t in teks_yang_digambar:          # dikumpulkan saat render
-    temuan["safe_area"] += safe_area(t.bbox, W, H, label=t.s)
-    temuan["glyph"]     += glyph_size(t.bbox, H, main=t.main, label=t.s)
-    temuan["kontras"]   += contrast(t.fill, t.bg, main=t.main, label=t.s)
-temuan["overlap"] = overlaps([(t.bbox, t.s) for t in teks_yang_digambar])
-print(report(temuan))
-```
+Bentuk yang saya sarankan: kumpulkan bbox setiap teks saat render, lalu periksa di akhir. Yang penting hasilnya **saran, bukan LULUS/GAGAL** — keputusan tetap milikmu.
 
 Snippet di bawah menunjukkan **prinsipnya** (memakai API contoh `Cam`); kalau pipeline-mu beda, padanan cara menangkap teks ada di tabel berikut. Yang wajib ada di pipeline mana pun:
 

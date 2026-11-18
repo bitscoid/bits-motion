@@ -137,7 +137,8 @@ Ritme dibuat bervariasi: pembuka yang langsung menarik perhatian, bagian tengah 
 Baca dua file referensi sebelum membangun apa pun:
 - `references/GUIDE.md` untuk arah kreatif, tipografi, animasi aset, transisi, **menerjemahkan ide jadi visual (§5), variasi komposisi antar scene (§6)**, dan mixing audio.
 - `references/RENDER.md` untuk cek lingkungan, pipeline render, perintah ffmpeg, dan cara verifikasi.
-- `references/scripts/gates.py` untuk fungsi pengukur siap pakai (safe area, tinggi glyph dua tingkat, tabrakan teks, kontras, pola berulang). Impor apa adanya, jangan tulis ulang rumusnya.
+
+Pemeriksaan QC **kamu tulis sendiri** saat dibutuhkan. Aturannya sudah lengkap dalam prosa: safe area, tinggi glyph dua tingkat, kontras WCAG, tabrakan teks (IoU), dan pola berulang — semuanya di `GUIDE.md` §2 dan `RENDER.md` §7. Terjemahkan ke kode sesuai renderer yang kamu pakai. Jangan cari perpustakaan bersama; tiap proyek punya struktur data sendiri, dan aturan yang jelas cukup dibaca.
 
 Sebelum menulis kode scene, pastikan setiap poin inti punya satu mekanisme visual yang bisa digambar (`GUIDE.md` §5). Kalau rencananya masih berupa "tampilkan kata besar di tengah" untuk semua scene, gagasannya belum jadi.
 
@@ -152,7 +153,7 @@ Periksa file MP4 hasil ekspor dari awal sampai akhir, bukan hanya timeline edito
 5. Musik mendukung dan suara tetap dominan.
 6. Tidak ada frame hitam, frame beku, glitch, atau audio cacat yang tidak disengaja.
 7. MP4 bisa diputar. Durasi aktual sama dengan durasi total yang dihitung di Tahap 4 (tidak melebihi batas yang berlaku), jumlah frame = durasi × 30, 30 fps, codec dan resolusi sesuai spesifikasi, tidak ada konten setelah detik terakhir, dan batas durasi yang dipakai disebutkan (default 60 detik atau angka yang user setujui). Semuanya dibuktikan dari metadata file hasil ekspor.
-8. Tiga gerbang skrip di `references/RENDER.md` §7 lulus: sinkron (tidak ada teks yang muncul sebelum katanya), geometri (safe area, keterbacaan ukuran, tabrakan, kontras), dan ekor audio (tidak ada keheningan tak sengaja sampai detik terakhir). Pakai `references/scripts/gates.py`; gerbang keempat (pola berulang) hanya menandai, keputusanmu.
+8. Tiga gerbang di `references/RENDER.md` §7 lulus: sinkron (tidak ada teks yang muncul sebelum katanya), geometri (safe area, keterbacaan ukuran, tabrakan, kontras), dan ekor audio (tidak ada keheningan tak sengaja sampai detik terakhir). Gerbang keempat (pola berulang) hanya menandai, keputusanmu. Buktikan hasilnya dengan angka, sebutkan di pesan serah terima.
 
 Cek kreatifnya juga, tapi dengan mata, bukan skrip: buka contact sheet hasil ekspor (`ffmpeg -i output.mp4 -vf "fps=1,scale=300:-1,tile=6x8" sheet.png`). Kalau semua thumbnail terlihat seperti satu template dengan kata berbeda, variasi komposisi belum cukup (`GUIDE.md` §6) — perbaiki sebelum serah terima.
 
