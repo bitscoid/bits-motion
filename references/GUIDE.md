@@ -33,6 +33,17 @@ Aturan:
 - Jaga safe area: elemen penting minimal ±5% dari tepi frame, supaya aman saat diputar layar penuh atau di-crop platform.
 - Ukuran teks terkecil tetap terbaca di resolusi output: minimal sekitar 4% dari tinggi frame (1080p ≈ 43 px).
 - Cek kontras teks vs latarnya di kode (bandingkan luminance). Kurang kontras → kasih panel atau gelapkan area di belakang teks, jangan mengandalkan bayangan tipis.
+- **Centering diukur, bukan diserahkan ke `anchor`.** `anchor="mm"` memusatkan kotak-em font, bukan bentuk glyph — angka, judul kapital, dan teks dengan descender akan terlihat geser di dalam bentuk. Untuk teks yang duduk di dalam objek (angka di lingkaran, label di kartu, teks di dalam blok warna) geser posisinya dengan selisih bbox glyph:
+
+```python
+bb = d.textbbox((px, py), s, font=f, anchor="mm")
+dx = (bb[0] + bb[2]) / 2 - px
+dy = (bb[1] + bb[3]) / 2 - py
+d.text((px - dx, py - dy), s, font=f, anchor="mm", fill=fill)
+```
+
+  Terukur: offset 10 px → 0,5 px. Kalau transform kamera dipakai (skala/geser), bagi `dx` dan `dy` dengan skala sebelum dipakai. Kalau teks punya `spacing` (per-huruf), `anchor` tidak berlaku — ukur lebar total dan pusatkan sendiri, jangan campur dua metode.
+- **Tumpukan teks diukur, bukan dikira.** Kalau beberapa baris saling menumpuk vertikal (label, judul, subjudul), hitung top/bottom tiap baris dari `textbbox` dan pastikan tidak ada irisan. Urutan baca harus sesuai urutan narasi, dan baris terakhir jangan berdempet dengan objek di bawahnya — sisakan celah minimal ~0,8× tinggi baris.
 
 ## 3. Menganimasikan aset
 

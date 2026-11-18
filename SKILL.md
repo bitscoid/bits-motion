@@ -27,6 +27,17 @@ Tidak ada durasi tetap. Audio yang menentukan panjang video, dan 60 detik adalah
 
 Begitu durasi total dihitung di Tahap 4, angka itu menjadi target pasti untuk render: file hasil harus tepat sebesar itu, tidak kurang dan tidak lebih. Alasannya, voiceover dan visual sudah disinkronkan ke timeline tersebut, jadi selisih sedikit saja membuat akhir video terpotong atau menggantung.
 
+## Aturan vs selera
+
+File ini mengatur **akurasi**, bukan **rupa**. Bedanya: aturan bisa dicek skrip, selera tidak.
+
+- **Wajib (bisa diukur):** timing mengikuti kata di suara, teks di dalam shape harus center secara glyph, tidak ada teks bertabrakan atau keluar safe area, tidak ada ekor audio mati, durasi frame persis.
+- **Bebas (keputusanmu):** palet, jumlah scene, urutan transisi, jenis tipografi, mood, posisi teks, ritme potongan, apakah sebuah ide butuh teks atau cukup visual.
+
+Jangan pernah memakai contoh di `references/` sebagai cetakan. Yang diwariskan adalah cara mengukur, bukan hasil ukurannya. Kalau sebuah aturan membuat pilihan kreatif jadi mustahil (mis. "hook wajib 3 detik"), itu tanda aturannya salah, bukan idemu yang salah.
+
+Satu pengecualian yang sering disalahpahami: teks layar **tidak wajib** punya kata pendukung di voiceover. Kalau kamu menaruh penekanan senyap, itu sah — cukup catat alasannya di timeline.
+
 ## Alur kerja
 
 Ikuti urutan ini. Jangan loncat ke render sebelum tahap 1–3 selesai.
@@ -85,7 +96,7 @@ Kalau user memberi gambar (upload atau path), semua visual dibangun dari gambar 
 
 1. Inventarisasi semua file, pahami fungsi tiap aset terhadap naskah. Ukur resolusi gambar user dengan PIL: gambar yang jauh lebih kecil dari resolusi output akan blur saat di-upscale — beri tahu user, atau rancang komposisinya supaya tetap bagus (misalnya pakai sebagai elemen kecil, bukan layar penuh).
 2. Ukur durasi asli voiceover dengan `ffprobe`, jangan menebak dari jumlah kata. Sekalian cek durasi masuk akal dibanding perkiraan naskah (±2,5 kata per detik); selisih jauh berarti suara mungkin terpotong — tangani dulu sebelum lanjut.
-3. Cari ritme bicara (jeda, pergantian kalimat, kata yang ditekankan) dengan alat analisis audio. AI tidak mendengar audio secara langsung, jadi sebut metode yang dipakai dan akui kalau timing per kata hanya perkiraan.
+3. Cari ritme bicara (jeda, pergantian kalimat, kata yang ditekankan). **Utamakan ASR word-timestamp** (`faster-whisper`, resep lengkap di `references/RENDER.md` §3) — waktu per kata dari suara itu sendiri, bukan dari jumlah kata. Estimasi kata per detik hanya untuk sanity check panjang naskah dan hanya dipakai kalau ASR benar-benar tidak bisa dijalankan; kalau begitu, katakan ke user bahwa timing per kata adalah perkiraan.
 4. Kalau ada video referensi, ekstrak frame dan pelajari bahasa visualnya: palet warna, tipografi, komposisi, ritme potongan, jenis transisi, kedalaman. Referensi hanya sumber inspirasi. Jangan menyalin adegan, penempatan teks, atau urutan animasinya.
 
 Durasi video final dihitung dari audio yang sebenarnya:
@@ -102,6 +113,8 @@ Contoh: voiceover 37,3 detik → 37,3 + 2,5 = 39,8 → video 40 detik (1.200 fra
 ### Tahap 5 — Rencanakan timeline (internal)
 
 Susun timeline dari 00:00 sampai durasi total hasil hitungan Tahap 4, berdasarkan audio sebenarnya. Jumlah scene mengikuti kebutuhan narasi, bukan angka tetap. Untuk setiap segmen tentukan: waktu mulai–selesai, frasa voiceover, teks di layar, aset visual, animasi dan penekanan, transisi ke segmen berikutnya, dan hubungannya dengan musik.
+
+Timing disimpan sebagai **satu tabel waktu absolut** yang dibaca semua scene (detail bentuknya di `references/RENDER.md` §5); batas scene diturunkan dari batas kalimat hasil ASR. Ini urusan akurasi, bukan gaya — isi kreatif tiap scene tetap keputusanmu.
 
 Ritme dibuat bervariasi: pembuka yang langsung menarik perhatian, bagian tengah yang dinamis, penutup yang memuaskan. Penjelasan penting diberi gerak yang lebih tenang dan terbaca. Timeline ini hanya perencanaan. Lanjut ke produksi, jangan berhenti di sini.
 
@@ -122,6 +135,7 @@ Periksa file MP4 hasil ekspor dari awal sampai akhir, bukan hanya timeline edito
 5. Musik mendukung dan suara tetap dominan.
 6. Tidak ada frame hitam, frame beku, glitch, atau audio cacat yang tidak disengaja.
 7. MP4 bisa diputar. Durasi aktual sama dengan durasi total yang dihitung di Tahap 4 (dan tidak lebih dari 60 detik), jumlah frame = durasi × 30, 30 fps, codec dan resolusi sesuai spesifikasi, dan tidak ada konten setelah detik terakhir. Semuanya dibuktikan dari metadata file hasil ekspor.
+8. Tiga gerbang skrip di `references/RENDER.md` §7 lulus: sinkron (tidak ada teks yang muncul sebelum katanya), geometri (safe area + tidak ada teks bertabrakan), dan ekor audio (tidak ada keheningan tak sengaja sampai detik terakhir).
 
 Perbaiki masalah yang ditemukan sebelum menyerahkan file. Serahkan MP4 sesuai lingkungan: pakai mekanisme serah file yang tersedia (tool khusus bila ada) atau langsung kasih path file. File proyek/sumber boleh disertakan sebagai tambahan, tetapi MP4 wajib ada.
 

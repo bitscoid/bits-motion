@@ -9,7 +9,7 @@ Baca file ini sebelum membangun dan me-render. Semua perintah di bawah adalah co
 4. Menganalisis video referensi
 5. Menyusun frame secara deterministik
 6. Mixing audio dan ekspor
-7. Verifikasi file hasil ekspor
+7. Verifikasi file hasil ekspor (termasuk gerbang sinkron, geometri, ekor audio)
 8. Musik latar buatan sendiri
 9. Jebakan umum
 10. Bersih-bersih setelah serah terima
@@ -86,7 +86,34 @@ Jeda dan batas kalimat (turunkan `noise` kalau rekaman bising):
 ffmpeg -i "Suara Voiceover.mp3" -af silencedetect=noise=-35dB:d=0.25 -f null - 2>&1 | grep silence_
 ```
 
-Timing per kata: kalau ada alat ASR/forced alignment yang benar-benar bisa dijalankan, pakai itu. Kalau tidak, bagi waktu menurut batas jeda hasil `silencedetect`, lalu distribusikan kata di dalam tiap frasa secara proporsional menurut jumlah suku kata atau huruf. Katakan kepada user bahwa timing per kata adalah perkiraan.
+Timing per kata: **ASR dulu, estimasi kata terakhir.** Hitung kata per detik hanya untuk sanity check naskah, jangan untuk menempatkan teks.
+
+Coba ASR ber-word-timestamp sebelum menyerah ke estimasi. `faster-whisper` praktis dan jalan di CPU:
+
+```python
+from faster_whisper import WhisperModel
+m = WhisperModel("small", device="cpu", compute_type="int8")
+segs, _ = m.transcribe(audio_array, language="id", word_timestamps=True)
+# segs[i].start/.end per kalimat; segs[i].words[j].word/.start/.end per kata
+```
+
+Beri `audio_array` numpy float32 16 kHz mono, **bukan path file**: di sebagian lingkungan `av` menolak `metadata_errors` sehingga `transcribe("file.wav")` gagal dengan `TypeError: open() got an unexpected keyword argument 'metadata_errors'`. Decode sendiri:
+
+```bash
+ffmpeg -v error -y -i "Suara Voiceover.wav" -ar 16000 -ac 1 vo16.wav
+```
+
+```python
+import wave, numpy as np
+w = wave.open("vo16.wav")
+a = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
+```
+
+Pakai hasil ASR apa adanya walau ada salah transkripsi (mis. "berumasuk") — yang dibutuhkan hanya batas waktu katanya, bukan ejaannya. Selisih ASR ±0,1 dtk tidak terlihat; selisih estimasi kata bisa 2 dtk dan itu terlihat jelas.
+
+Kalau ASR tidak tersedia atau gagal: bagi waktu menurut batas jeda `silencedetect`, distribusikan kata per frasa menurut suku kata, dan **katakan ke user bahwa timing per kata adalah perkiraan**.
+
+Kalau VO di-`adelay` saat mixing (mis. mulai detik 1), semua waktu ASR harus ditambah delay itu sebelum dipakai di timeline. Tulis sebagai satu konstanta (`VO_DELAY`) dan turunkan semua waktu darinya, jangan tambahkan manual di tiap scene.
 
 Catatan ekstensi: contoh di bawah memakai `Suara Voiceover.mp3`, tapi sesuaikan dengan file yang nyata ada — hasil generate TTS otomatis berupa `Suara Voiceover.wav`, rekaman user bisa .mp3/.wav/.m4a.
 
@@ -198,6 +225,7 @@ Kualitas hasil cari sendiri tidak terkontrol. Wajib: sebut ke user video referen
 - Motion blur bisa disimulasikan dengan merata-ratakan beberapa sub-frame pada waktu yang sedikit berbeda.
 - Render paralel dan bisa resume: karena frame deterministik, gambar dengan beberapa worker (mis. `multiprocessing`, 4–8 proses) dan lewati frame yang file PNG-nya sudah ada dan tidak kosong. Kalau render mati di tengah, jalankan ulang skrip yang sama — hanya frame yang hilang yang digambar ulang.
 - Pasang timeline dari tahap 5 sebagai data (daftar segmen dengan waktu mulai/selesai) supaya mudah disetel ulang.
+- **Satu tabel waktu absolut sebagai sumber tunggal.** Semua waktu kemunculan elemen (`{label: detik_video}`) tinggal di satu tabel, dan scene membaca dari tabel itu — scene tidak menyimpan offset masuk sendiri. Batas scene diturunkan dari batas kalimat ASR, bukan diketik terpisah. Kalau tiap scene punya angka kirimannya sendiri, menggeser satu kalimat berarti menggeser enam angka dan drift balik lagi di scene berikutnya. Label waktu juga jangan di-hardcode ke detik saat beat-nya masih bisa berubah: pakai `B_VIDEO[key] - scene_start` dihitung saat render, jangan `0.55` yang dibekukan.
 - Render frame 0 sampai (jumlah frame − 1). Frame terakhir harus tetap berisi visual penutup yang jelas, bukan layar kosong.
 
 ## 6. Mixing audio dan ekspor
@@ -270,6 +298,61 @@ ffmpeg -i output.mp4 -af volumedetect -vn -f null - 2>&1 | grep -E "mean_volume|
 
 **Gerbang QC gerak:** hasil `freezedetect=n=0:d=1.0` harus kosong, kecuali jeda statis yang sengaja dan tercatat di timeline (maksimal 1 jeda, ≤1,5 dtk, di penutup). Kalau ada freeze berarti render benar-benar diam — kembali ke §5, tambahkan kamera mikro atau animasi elemen, render ulang. Lapor hasil gerbang ini ke user bersama angka durasi.
 
+**Gerbang ekor audio:** `silencedetect` di file final harus kosong sampai detik terakhir, bukan cuma di tengah. Musik yang mati sebelum video habis terdeteksi sebagai `silence_start` di beberapa detik terakhir dan itu cacat, bukan pilihan. Penyebab paling sering: `loudnorm` dipasang inline bersama `apad` dalam satu `filter_complex` — padding jadi ikut masuk rantai loudnorm dan ekornya mati (terukur: −91 dB pada 2,1 dtk terakhir, sementara sumbernya −15 dB). Normalisasi VO ke file sendiri dulu, baru mix:
+
+```bash
+ffmpeg -y -i "Suara Voiceover.wav" -af "loudnorm=I=-16:TP=-1.5:LRA=11" -ar 48000 vo_norm.wav
+```
+
+Kalau musik tetap ingin punya fade-out, buat fade di file musiknya sendiri dan pastikan ujungnya tidak menyentuh nol persis di detik terakhir.
+
+### Dua gerbang tambahan: sinkron dan geometri
+
+Keduanya skrip, jalan di atas frame hasil render, dan menangkap kelas cacat yang tidak terlihat saat menonton sekali jalan.
+
+**Gerbang sinkron.** Untuk setiap teks kunci, buktikan dua hal: teks sudah ada di `t_kata + 0,10` dan belum ada di `t_kata − 0,15` (jendela bisa disetel, yang penting asimetris — lebih baik telat 0,1 dtk daripada muncul sebelum kata). Tangkap semua teks yang tergambar dengan membungkus pemanggil teks, lalu cocokkan nama teksnya:
+
+```python
+seen = []
+orig = Cam.text
+def patched(self, x, y, s, size, fill, **kw):
+    if kw.get("alpha", 255) > 40 and size > 20:
+        seen.append(str(s))
+    return orig(self, x, y, s, size, fill, **kw)
+Cam.text = patched
+
+def at(t):
+    seen.clear(); render_frame(int(round(t * 30))); return list(dict.fromkeys(seen))
+
+for t_kata, teks in checks:
+    assert teks in at(t_kata + 0.10), f"telat/hilang: {teks} @ {t_kata}"
+    assert teks not in at(t_kata - 0.15), f"muncul terlalu awal: {teks} @ {t_kata}"
+```
+
+Kalau gagal, perbaiki tabel waktu — jangan geser angka di dalam scene (lihat §5).
+
+**Gerbang geometri.** Dua cek, keduanya pakai metrik font yang benar-benar dipakai, bukan tebakan:
+
+```python
+# 1) safe area: tidak ada glyph keluar 3,2% tepi frame
+bb = d.textbbox((px, py), s, font=f, anchor=anchor)
+assert bb[0] > W * 0.032 and bb[2] < W * 0.968
+assert bb[1] > H * 0.032 and bb[3] < H * 0.968
+
+# 2) tabrakan antar teks: IoU kotak glyph
+def iou(a, b):
+    x0, y0 = max(a[0], b[0]), max(a[1], b[1])
+    x1, y1 = min(a[2], b[2]), min(a[3], b[3])
+    if x1 <= x0 or y1 <= y0:
+        return 0.0
+    inter = (x1 - x0) * (y1 - y0)
+    return inter / ((a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - inter)
+
+assert iou(bb_a, bb_b) < 0.16
+```
+
+Teks yang sama digambar dua kali di posisi sama (mis. teks di atas blok sorot) memang IoU 1,0 — itu disengaja, kecualikan pasangan identik. Jalankan kedua gerbang sebelum ekspor, bukan setelah; lebih murah render ulang satu scene daripada satu video.
+
 Dua hal yang bikin gerbang ini salah kepikiran:
 - `freezedetect` dengan `n=-60dB` (nilai default) FALSE POSITIVE di motion graphic: decoded frame di rentang "freeze" bisa berubah ribuan piksel per frame (elemen idle, dot napas) tapi filter tetap bilang freeze karena ambangnya terlalu tinggi untuk grafis flat. Selalu pakai `n=0`.
 - Frame sumber bergerak tapi MP4 terdeteksi freeze di titik yang sama? Itu encoder: elemen kecil (radius <15 px, gerak <10 px/frame) di area flat besar bisa ter-quantize hilang di CRF 18+. Perbesar elemen idle atau turunkan CRF ke 16, bukan tambah gerakan baru.
@@ -306,6 +389,9 @@ Pakai maksimal beberapa kali per video, volumenya selalu di bawah voiceover, dan
 - **Teks Bahasa Indonesia terpotong di tepi**: ukur lebar teks dengan fungsi pengukur font, bukan menebak.
 - **File sangat besar**: naikkan CRF (misalnya 20–22), jangan menurunkan resolusi.
 - **`alimiter` dipasang tapi `max_volume` tetap 0 dB**: opsi `level` bawaan alimiter adalah 1 (auto-level) — setelah membatasi, sinyal dinormalisasi BALIK ke 0 dBFS. Wajib `alimiter=limit=0.85:level=0`. Terbukti: `limit=0.79` saja tetap menghasilkan max 0,0 dB; dengan `level=0` hasilnya -1,3 dB.
+- **`amix` menormalkan sendiri, dan itu mengubah aturan `volume`**: di ffmpeg < 7.0 `amix` selalu membagi per jumlah input, jadi `volume=2` wajib untuk mengembalikan level. Di 7.0+ ada `normalize=0` dan `volume=2` jadi salah — hasilnya dobel amplitudo lalu kena limiter. Cek dulu: `ffmpeg -version | head -1`, baru pilih. Kalau ragu, pakai `normalize=0` dan ukur hasilnya dengan `volumedetect`, jangan percaya rumus.
+- **`loudnorm` inline + `apad` = ekor audio mati**: jangan campur keduanya dalam satu `filter_complex`. Normalisasi VO ke file terpisah lebih dulu (lihat §7 gerbang ekor audio).
+- **`textbbox` dengan `anchor` tidak sama dengan bentuk glyph**: melihat bb[1]/bb[3] sebagai simetris terhadap titik anchor akan salah untuk angka dan teks kapital. Selalu hitung selisih pusat bbox terhadap titik anchor sebelum menempatkan di dalam bentuk (lihat GUIDE.md §2).
 - **Elemen idle kecil kena quantize encoder**: dot/particle radius <15 px yang cuma berdenyut di area flat besar bisa hilang setelah encode (CRF 18+), sehingga frame decoded jadi identik → freeze nyata di MP4 padahal renderer menggambar gerakan. Perbesar elemen (radius ≥14 px, amplitudo geser ≥10 px), dan gerak posisinya, bukan cuma radius-only (perubahan radius lingkaran solid tanpa antialias sering tidak mengubah piksel mana pun).
 
 ## 10. Bersih-bersih setelah serah terima
