@@ -169,7 +169,7 @@ Verified on ffmpeg 7.1. Every ffmpeg behaviour cited in the docs was measured on
 |---|---|
 | **`SKILL.md`** | the workflow — 7 stages, decision tables, ready-to-print user messages |
 | **`references/GUIDE.md`** | creative direction — typography, animation, transitions, turning ideas into visuals |
-| **`references/RENDER.md`** | engineering — environment, fonts, ffmpeg, the four QC gates |
+| **`references/RENDER.md`** | engineering — environment, fonts, ffmpeg, and the QC gates |
 
 Every measured number lives in `RENDER.md`. Every creative freedom lives in `GUIDE.md`. Neither pretends to be the other.
 
@@ -177,7 +177,7 @@ Every measured number lives in `RENDER.md`. Every creative freedom lives in `GUI
 
 ## 🎨 Fonts
 
-The catalogue ships **42 families across 8 registers** as a starting point, never a menu. If the topic needs typography that isn't there, the skill downloads it:
+The catalogue ships **38 families across 8 registers** as a starting point, never a menu. If the topic needs typography that isn't there, the skill downloads it:
 
 ```bash
 curl -sL -o /tmp/font.ttf \

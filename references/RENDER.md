@@ -466,7 +466,7 @@ assert iou(bb_a, bb_b) < 0.16
 assert ratio(fill, bg_color) >= (3.0 if is_main else 4.5), f"contrast too low: {s}"
 ```
 
-**Contrast gate** uses the same WCAG formula as `GUIDE.md` §2. Measured on palettes in common use: ink-on-cream and cream-on-dark pass well above 4.5:1, but a light salmon accent on cream reaches only **1.85:1** — a hard fail for any text. When this gate rejects, do not lower the threshold: change the colour, move the text onto a dark background, or place a solid panel behind it.
+**Contrast gate** uses the same WCAG formula as `GUIDE.md` §2. Measured on palettes in common use: ink-on-cream and cream-on-dark pass well above 4.5:1, but a light salmon accent on cream reaches only **1.85:1** — a hard fail for any text; darkening that accent to `(166, 82, 70)` brings it to **4.56:1**, which passes for supporting text. When this gate rejects, do not lower the threshold: change the colour, move the text onto a dark background, or place a solid panel behind it.
 
 ### Third gate: repetition pattern (flags, never rejects)
 
@@ -503,7 +503,7 @@ If two consecutive scenes share a pattern, **do not change them automatically**.
 
 Deliberate repetition is often good and always legitimate. What must surface is repetition born of no decision. The gate forces that decision to be written down; it never homogenises the output.
 
-The same text drawn twice at the same position (e.g. text over a highlight block) is IoU 1.0 — deliberate; exclude identical pairs. Run all four gates before export, not after; re-rendering one scene is cheaper than re-rendering a video.
+The same text drawn twice at the same position (e.g. text over a highlight block) is IoU 1.0 — deliberate; exclude identical pairs. Run every gate before export, not after; re-rendering one scene is cheaper than re-rendering a video.
 
 Two things that make these gates mislead:
 - `freezedetect` with `n=-60dB` (the default) FALSE POSITIVES on motion graphics: decoded frames inside the "frozen" range can change thousands of pixels per frame (idle elements, breathing dots) yet the filter still reports a freeze because the threshold is too high for flat graphics. Always use `n=0`.
