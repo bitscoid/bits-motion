@@ -1,52 +1,52 @@
-# Panduan Visual dan Kreatif
+# Visual and Creative Direction
 
-Baca file ini sebelum membangun scene. Isinya adalah arah eksekusi kreatif (tipografi, animasi, transisi, sinkronisasi, audio); arah gaya visual selalu berasal dari video referensi yang terpilih. Sesuaikan dengan aset user dan topik; jangan memaksakan warna atau layout yang sama di setiap scene.
+Read this before building any scene. It covers execution — typography, asset animation, transitions, sync, audio. **Visual style always comes from the chosen reference video**; adapt to the user's assets and topic rather than imposing one palette or layout everywhere.
 
-## Daftar isi
-1. Membaca video referensi
-2. Tipografi kinetik
-3. Menganimasikan aset
-4. Transisi
-5. Menerjemahkan ide jadi visual
-6. Variasi yang menjaga konsistensi
-7. Sinkronisasi dengan voiceover
-8. Musik dan mixing audio
+## Contents
+1. Reading a reference video
+2. Kinetic typography
+3. Animating assets
+4. Transitions
+5. Turning ideas into visuals
+6. Variation that keeps a system
+7. Sync with the voiceover
+8. Music and audio mixing
 
-## 1. Membaca video referensi
+## 1. Reading a reference video
 
-Referensi adalah tolok ukur kualitas, bukan cetakan. Yang diambil adalah prinsipnya: kenapa video itu enak dilihat, bukan urutan efeknya.
+A reference is a quality bar, not a mould. What transfers is the principle — why the video feels good, not the order of its effects.
 
-Perhatikan: palet warna, hierarki tipografi, cara teks dan gambar saling bertumpuk, ritme potongan, jenis transisi, penggunaan bayangan dan kedalaman, serta hubungan gerak dengan suara.
+Look at: palette, typographic hierarchy, how text and image stack, cut rhythm, transition types, use of shadow and depth, and how motion relates to sound.
 
-Yang dilarang: menyalin adegan satu per satu, memakai komposisi yang sama persis, menempatkan teks di posisi yang sama, atau meniru urutan animasi dan transisi frame demi frame. Tujuannya video yang orisinal dan terasa lebih rapi dari referensinya.
+Forbidden: copying shots one by one, reusing the exact composition, placing text in the same positions, or reproducing the animation and transition order frame by frame. The goal is work that is original and tighter than its reference.
 
-## 2. Tipografi kinetik
+## 2. Kinetic typography
 
-Tipografi adalah elemen bercerita, bukan sekadar subtitle.
+Typography is a storytelling element, not a subtitle layer.
 
-Teknik yang bisa dipakai sesuai konteks: teks muncul bersamaan dengan kata yang diucapkan, reveal dengan mask, animasi kata atau huruf bertahap, skala dengan overshoot terkontrol, animasi spasi antar huruf, teks masuk dari balik objek, clipping dan layering kreatif, penekanan lewat ketebalan, warna, atau ukuran.
+Techniques, chosen by context: text appearing with the spoken word, mask reveals, staged word or letter reveals, controlled overshoot scaling, letter-spacing animation, text emerging from behind objects, creative clipping and layering, emphasis through weight, colour, or size.
 
-Aturan:
-- Pilih font modern, tebal, dan sangat terbaca. Pakai font asli lewat kode (bukan teks hasil generate gambar), sehingga huruf tidak pernah rusak atau jadi kata palsu.
+Rules:
+- Choose fonts that are modern, heavy, and highly legible. Use real fonts through code (never text rendered by an image generator) so letters never break or turn into fake words.
 
-  **Font bukan menu tetap.** Katalog di `RENDER.md` §"Font siap pakai" adalah contoh yang sudah terpasang, bukan daftar pilihan yang boleh dipakai. Tugasmu: pilih tipografi yang **cocok dengan topik dan mood referensi**, bukan yang paling atas di tabel. Kalau topik butuh sesuatu yang belum ada (mis. topik kuliner butuh slab serif gemuk, topik arsip butuh condensed tebal, topik teknologi butuh grotesk sempit), **unduh sendiri** — jangan turun ke font yang "cukup mirip" hanya karena sudah terpasang. Resep unduh + verifikasi ada di `RENDER.md` §1 "Menambah font baru".
+  **The font catalogue is not a menu.** The list in `RENDER.md` §"Fonts ready to use" is what happens to be installed, not the set of allowed choices. Your job is to pick typography that **fits the topic and the reference mood**, not the first row of the table. If the topic needs something missing (a food topic wanting a fat slab serif, an archive topic wanting a heavy condensed face, a tech topic wanting a narrow grotesk), **download it** — never settle for "close enough" just because it's installed. The download recipe and verification are in `RENDER.md` §1.
 
-  Batasnya bukan jenis font, tapi jumlah: maksimal 2–3 family per video supaya tetap satu keluarga. Cek dengan `fc-list` atau `fc-query` sebelum dipakai di scene.
-- Pertahankan ejaan dan makna teks persis seperti naskah.
-- Pecah teks jadi frasa pendek. Jangan menampilkan satu paragraf utuh sekaligus. Sorot hanya kata kunci.
-- Pisahkan jelas tingkatan: judul, kata kunci, teks pendukung, label kecil.
-- Hindari huruf besar acak, font yang sulit dibaca, dan dekorasi berlebihan.
-- Jaga safe area: elemen penting minimal ±4% dari tepi frame. Pakai angka ini, jangan nilai lain, supaya tidak ada dua kebenaran (gerbang geometri di `RENDER.md` §7 memakai 4%).
-- Ukuran teks terkecil tetap terbaca di resolusi output. **Ambangnya tinggi glyph, bukan ukuran font** — glyph kapital hanya sekitar 0,75× ukuran font, jadi `truetype(size=100)` menghasilkan glyph ±75 px. Ukur dengan `textbbox`, jangan dari angka `size`. Dua tingkat:
-  - **teks utama / kata kunci**: tinggi glyph ≥ 4% tinggi frame (1920 → 77 px; berarti font ≈ 102 px).
-  - **teks pendukung / label / chip kecil**: tinggi glyph ≥ 2,5% tinggi frame (1920 → 48 px; font ≈ 64 px), dan wajib lolos kontras 4,5:1 karena ukurannya kecil.
+  The limit is quantity, not typeface: at most 2–3 families per video so it stays one system. Verify with `fc-list` or `fc-query` before using it in a scene.
+- Preserve spelling and meaning exactly as scripted.
+- Break copy into short phrases. Never show a whole paragraph at once. Highlight keywords only.
+- Keep clear levels: title, keyword, supporting line, small label.
+- Avoid random capitals, hard-to-read faces, and decorative excess.
+- Respect the safe area: important elements stay at least **4%** from the frame edge. Use that number and no other, so there is never a second truth about it (the geometry gate in `RENDER.md` §7 uses 4%).
+- The smallest text must stay legible at output resolution. **The threshold is glyph height, not font size** — capital glyphs are roughly 0.75× the font size, so `truetype(size=100)` yields ~75 px glyphs. Measure with `textbbox`, never from the `size` argument. Two tiers:
+  - **primary text / keywords**: glyph height ≥ 4% of frame height (1920 → 77 px, meaning font ≈ 102 px).
+  - **supporting text / labels / small chips**: glyph height ≥ 2.5% of frame height (1920 → 48 px, font ≈ 64 px), and must clear 4.5:1 contrast because it is small.
 
-  Kalau baris pendukung tidak muat di tingkat 2,5% bersama elemen lain, kurangi jumlah kata di baris itu — jangan turunkan ambangnya. Ukur hasilnya, jangan dikira.
-- Cek kontras teks vs latarnya di kode, jangan dikira dari nama warna. Ambangnya terukur dan diikat ke **peran teks**, bukan ukuran piksel:
-  - **teks utama / kata kunci: 3,0:1**
-  - **teks pendukung / label / chip: 4,5:1** — lebih ketat dari WCAG "large text", karena teks kecil yang bergerak cepat terbaca jauh lebih buruk daripada teks diam berukuran sama.
+  If a supporting line will not fit at 2.5% alongside other elements, cut words from that line — never lower the threshold. Measure the result; don't estimate.
+- Check text-against-background contrast in code, never by judging colour names. Thresholds are measurable and tied to the text's **role**, not its pixel size:
+  - **primary text / keywords: 3.0:1**
+  - **supporting text / labels / chips: 4.5:1** — stricter than WCAG "large text", because small moving text reads far worse than static text of the same size.
 
-  Hitung dengan rumus WCAG:
+  Compute with the WCAG formula:
 
 ```python
 def lum(c):  # c = (r, g, b) 0-255
@@ -61,8 +61,8 @@ def ratio(a, b):
     return (la + 0.05) / (lb + 0.05)
 ```
 
-  Gagal → beri panel solid di belakang teks atau gelapkan areanya, jangan mengandalkan bayangan tipis. Teks di atas gambar user wajib diukur terhadap piksel yang benar-benar di belakangnya (ambil rata-rata area), bukan terhadap warna dominan gambar.
-- **Centering diukur, bukan diserahkan ke `anchor`.** `anchor="mm"` memusatkan kotak-em font, bukan bentuk glyph — angka, judul kapital, dan teks dengan descender akan terlihat geser di dalam bentuk. Untuk teks yang duduk di dalam objek (angka di lingkaran, label di kartu, teks di dalam blok warna) geser posisinya dengan selisih bbox glyph:
+  On failure: place a solid panel behind the text or darken the area — never rely on a thin drop shadow. Text over user images must be measured against the pixels actually behind it (sample the region), not the image's dominant colour.
+- **Centring is measured, not delegated to `anchor`.** `anchor="mm"` centres the font's em box, not the glyph shape — numerals, capital titles, and text with descenders visibly drift inside a shape. For text sitting inside an object (a numeral in a circle, a label on a card, text in a colour block), offset by the glyph bbox:
 
 ```python
 bb = d.textbbox((px, py), s, font=f, anchor="mm")
@@ -71,89 +71,89 @@ dy = (bb[1] + bb[3]) / 2 - py
 d.text((px - dx, py - dy), s, font=f, anchor="mm", fill=fill)
 ```
 
-  Terukur: offset 10 px → 0,5 px. Kalau transform kamera dipakai (skala/geser), bagi `dx` dan `dy` dengan skala sebelum dipakai. Kalau teks punya `spacing` (per-huruf), `anchor` tidak berlaku — ukur lebar total dan pusatkan sendiri, jangan campur dua metode.
-- **Tumpukan teks diukur, bukan dikira.** Kalau beberapa baris saling menumpuk vertikal (label, judul, subjudul), hitung top/bottom tiap baris dari `textbbox` dan pastikan tidak ada irisan. Urutan baca harus sesuai urutan narasi, dan baris terakhir jangan berdempet dengan objek di bawahnya — sisakan celah minimal ~0,8× tinggi baris.
+  Measured: offset 10 px → 0.5 px. If a camera transform is active (scale/shift), divide `dx` and `dy` by the scale before applying. If the text uses per-letter `spacing`, `anchor` no longer applies — measure total width and centre it manually; never mix the two methods.
+- **Text stacks are measured, not assumed.** When several lines stack vertically (label, title, subtitle), compute each line's top/bottom from `textbbox` and confirm there is no intersection. Reading order must match narrative order, and the last line must not crowd the object below it — leave at least ~0.8× line height.
 
-## 3. Menganimasikan aset
+## 3. Animating assets
 
-Aset penting jangan dibiarkan diam kecuali memang ada momen jeda yang disengaja. Ini kewajiban, bukan pilihan: di setiap scene minimal satu elemen bergerak setiap saat; kalau tidak ada yang wajar bergerak, pakai gerak kamera mikro (zoom drift atau geser halus sepanjang scene). Video motion graphic yang statis di scene mana pun dianggap gagal QC (gerbang freezedetect ada di `RENDER.md` §7).
+Important assets must not sit still unless there is a deliberate beat of rest. This is a requirement, not an option: every scene keeps at least one element moving at all times; if nothing would naturally move, use micro camera motion (slow zoom drift or a gentle pan across the scene). A motion graphic that is static in any scene fails QC (the freezedetect gate is in `RENDER.md` §7).
 
-Batas bawahnya bukan selera, tapi encoder: gerakan yang terlalu kecil (radius <15 px, geser <10 px) bisa ter-quantize hilang di CRF 18+ sehingga frame jadi identik. Ukur gerakannya, jangan dikira.
+The lower bound is not taste, it is the encoder: motion that is too small (radius <15 px, shift <10 px) can be quantised away at CRF 18+, leaving identical frames. Measure the motion; don't assume.
 
-Teknik: scale in/out, gerak terarah dan rotasi halus, parallax dan lapisan kedalaman, reveal dengan mask, zoom kamera terkontrol, cropping kreatif, gerak melayang dan gerak sekunder, motion blur dan bayangan lembut, serta hubungan visual antara aset dan teks.
+Techniques: scale in/out, directional motion and gentle rotation, parallax and depth layers, mask reveals, controlled camera zoom, creative cropping, floating motion and secondary motion, motion blur and soft shadows, and visual relationships between assets and text.
 
-Variasikan teknik sesuai isi. Gunakan easing profesional (percepatan, perlambatan, overshoot, antisipasi, settling), bukan kecepatan konstan.
+Vary techniques with content. Use professional easing (acceleration, deceleration, overshoot, anticipation, settling) rather than constant speed.
 
-Boleh memotong, mengubah ukuran, memposisikan, memasking, dan menumpuk aset user selama makna dan detail pentingnya tidak hilang. Jangan memotong objek penting, jangan meregangkan gambar, jangan biarkan elemen bertabrakan canggung.
+You may crop, resize, position, mask, and layer user assets as long as meaning and important detail survive. Never cut through a key subject, never stretch an image, never leave elements colliding awkwardly.
 
-Pemotongan latar (cut-out): kalau tool pemotong latar tidak tersedia, pakai masking manual atau framing yang membuat gambar tetap menarik tanpa cut-out, dan jangan menjanjikan hasil cut-out yang tidak bisa dibuat.
+Background removal: if no cut-out tool exists, use manual masking or framing that looks good without a cut-out — and never promise a cut-out you cannot produce.
 
-## 4. Transisi
+## 4. Transitions
 
-Pilihan: match cut, whip, wipe terarah, reveal dengan mask, transisi bentuk, transisi skala, transisi yang digerakkan tipografi, transisi parallax berlapis, transisi motion blur, dan elemen grafis yang berpindah antar scene.
+Options: match cut, whip, directional wipe, mask reveal, shape transition, scale transition, typography-driven transition, layered parallax transition, motion-blur transition, and graphic elements that carry across scenes.
 
-Ini pilihan, bukan daftar centang. Pilih yang cocok dengan isi dan jaga kesatuan gaya. Sebisa mungkin hubungkan elemen visual antar scene supaya tidak terasa terputus.
+These are options, not a checklist. Pick what fits the content and keep the system coherent. Where possible, connect visual elements across scenes so nothing feels severed.
 
-Ritme ditentukan isi, bukan angka. Patokan "scene inti beberapa detik" hanya deskripsi video pendek pada umumnya — kalau sebuah ide butuh 8 detik untuk mendarat, beri 8 detik. Yang tetap dijaga: variasi terbesar ditaruh di pembuka, dan scene di sepertiga akhir jangan terlalu pendek sampai penonton tidak sempat mencerna.
+Rhythm comes from content, not numbers. The "core scenes run a few seconds" note merely describes short video in general — if an idea needs 8 seconds to land, give it 8. What still holds: put the biggest variation in the opening, and never make late-third scenes so short the viewer cannot absorb them.
 
-Hindari glitch berlebihan, putaran acak, kilatan tanpa alasan, dan transisi yang menutupi penjelasan. Semua transisi harus muat di dalam durasi total yang sudah dihitung. Durasi video tidak boleh melar karena transisi.
+Avoid excessive glitch, random spins, unmotivated flashes, and transitions that mask the explanation. Every transition must fit inside the computed total duration. The video never grows because of a transition.
 
-## 5. Menerjemahkan ide jadi visual
+## 5. Turning ideas into visuals
 
-Tipografi saja membuat video terasa seperti presentasi teks bergerak. Yang membedakan motion graphic bagus adalah **gagasan visual** — satu cara memandang ide yang bisa digambar.
+Typography alone makes a video feel like a moving-text presentation. What separates strong motion graphics is a **visual idea** — one way of seeing the concept that can be drawn.
 
-Sebelum membangun scene, untuk setiap poin inti pilih satu **mekanisme visual**, bukan sekadar kata besar di tengah:
+Before building scenes, give each core point one **visual mechanism**, not just a big word in the centre:
 
-| Mekanisme | Pertanyaan yang dijawab | Contoh bentuk |
+| Mechanism | Question it answers | Example form |
 |---|---|---|
-| Skala/perbandingan | "seberapa besar?" | satu figur kecil di antara ratusan; angka raksasa vs benda mungil |
-| Akumulasi | "menumpuk jadi apa?" | benda bertambah sampai memenuhi frame (kewajiban, tuntutan, jam) |
-| Transformasi | "berubah jadi apa?" | satu bentuk berubah jadi bentuk lain (mainan → meja belajar) |
-| Pemisahan/belah | "apa yang terpisah?" | satu bentuk terbelah, satu bagian menjauh (anak vs tuntutan) |
-| Jalur/gerak | "ke mana arahnya?" | garis waktu, panah, jalur yang bercabang |
-| Wadah/kapasitas | "muat atau tidak?" | gelas meluap, kotak sesak, kapasitas terisi penuh |
-| Kontras berdampingan | "beda di mana?" | dua keadaan bersebelahan, bukan berurutan |
-| Siklus | "berulang bagaimana?" | lingkaran yang berputar, hari yang sama terulang |
+| Scale / ratio | "how big is it?" | one small figure among hundreds; a huge number against a tiny object |
+| Accumulation | "what does it pile into?" | objects multiplying until they fill the frame (obligations, demands, hours) |
+| Transformation | "what does it become?" | one shape turning into another (toy → study desk) |
+| Splitting | "what is coming apart?" | one shape cleaving, a piece drifting away (child vs demands) |
+| Path / motion | "where is it heading?" | timeline, arrow, forking route |
+| Container / capacity | "does it fit?" | a glass overflowing, a box crammed, capacity filled |
+| Side-by-side contrast | "what is the difference?" | two states adjacent, not sequential |
+| Cycle | "how does it repeat?" | a rotating loop, the same day recurring |
 
-Aturan mainnya:
-- Satu scene cukup satu mekanisme utama. Dua mekanisme bersamaan saling melemahkan.
-- Boleh meminjam idiom visual (grafik batang, jam, tumpukan) tapi jangan membiarkannya jadi ikon generik tanpa arti khusus untuk topik itu.
-- Kalau ide tidak bisa digambar tanpa teks, itu tanda ide belum visual — ganti mekanismenya, jangan menambah teks.
-- Mekanisme boleh berulang sebagai motif antar scene (mis. akumulasi dipakai dua kali), asalkan bentuknya berkembang.
+Working rules:
+- One main mechanism per scene. Two at once weaken each other.
+- Borrowing visual idioms (bar chart, clock, stack) is fine, but never let them stay generic icons with no meaning specific to this topic.
+- If an idea cannot be drawn without text, the idea isn't visual yet — change the mechanism instead of adding words.
+- A mechanism may recur as a motif across scenes (accumulation used twice) as long as its form evolves.
 
-Ini bukan daftar wajib. Kalau ide punya bentuk yang lebih baik di luar tabel, pakai itu.
+This is not a required list. If an idea has a better shape outside the table, use it.
 
-## 6. Variasi yang menjaga konsistensi
+## 6. Variation that keeps a system
 
-Video pendek dengan belasan scene mudah jatuh jadi "slide yang sama, kata berbeda". Cara menghindarinya tanpa kehilangan kesatuan:
+A short video with a dozen scenes slides easily into "same layout, different words". How to avoid it without losing coherence:
 
-- **Variasikan komposisi**, bukan cuma isi: teks kiri + gambar kanan, teks tengah polos, teks menempel tepi, teks bertumpuk objek, teks sangat kecil di ruang luas.
-- **Variasikan kepadatan**: scene penuh (banyak elemen) diselingi scene lapang (satu elemen, banyak ruang kosong). Kepadatan seragam melelahkan.
-- **Variasikan latar**: terang/gelap boleh bergantian, tapi satu warna aksen tetap dipegang sepanjang video supaya terasa satu keluarga.
-- **Variasikan skala**: satu scene dengan elemen raksasa yang memotong frame akan membuat scene lain terasa lapang, meski ukurannya biasa.
-- **Jaga satu hal tetap**: satu warna aksen, satu font display, satu jenis gerak dominan. Yang tetap itulah yang membuat variasi terasa disengaja, bukan acak.
+- **Vary composition**, not just content: text left + image right, plain centred text, text hugging an edge, text layered behind an object, very small text in a wide space.
+- **Vary density**: dense scenes (many elements) alternating with airy ones (one element, lots of space). Uniform density exhausts the viewer.
+- **Vary background**: light/dark may alternate, but hold one accent colour across the whole video so it reads as one family.
+- **Vary scale**: one scene with an oversized element bleeding off-frame makes the rest feel airy even at normal size.
+- **Hold one thing constant**: one accent colour, one display face, one dominant motion type. That constant is what makes the variation feel intentional rather than random.
 
-Periksa hasilnya lewat lembar kontak (`ffmpeg ... tile`) sebelum ekspor: kalau semua bingkai kecilnya terlihat mengikuti satu pola yang sama, variasinya belum cukup.
+Check the result with a contact sheet (`ffmpeg ... tile`) before export: if every thumbnail follows the same pattern, variation is insufficient.
 
-## 7. Sinkronisasi dengan voiceover
+## 7. Sync with the voiceover
 
-Voiceover adalah acuan timing utama, sedangkan durasi total video ditetapkan di Tahap 4 SKILL.md (durasi suara + pembuka dan penutup, dibatasi `MAX_DUR` yang default-nya 60 detik).
+The voiceover is the primary timing source; total duration is set in stage 4 of `SKILL.md` (voice + lead-in + tail, capped by `MAX_DUR`, default 60 s).
 
-Timing per kata diambil dari suara itu sendiri lewat pengenalan suara ber-timestamp per kata, bukan dari jumlah kata (`RENDER.md` §3). Semua kemunculan teks dibaca dari satu tabel waktu absolut (`RENDER.md` §5), dan hasilnya dibuktikan gerbang sinkron (`RENDER.md` §7): teks tidak boleh muncul sebelum katanya.
+Word timing comes from the audio itself through speech recognition with per-word timestamps, not from word count (`RENDER.md` §3). Every text appearance reads from one absolute-time table (`RENDER.md` §5), and the result is proven by the sync gate (`RENDER.md` §7): text may never appear before its word.
 
-Untuk setiap frasa penting: tampilkan teks saat kata itu diucapkan, munculkan aset saat relevan, tekankan kata kunci lewat skala/warna/bobot/posisi/gerak, berikan jeda visual singkat ketika penonton butuh waktu mencerna, dan sesuaikan kecepatan animasi dengan ritme pembicara.
+For each key phrase: show the text as the word is spoken, reveal assets when relevant, emphasise keywords through scale/colour/weight/position/motion, allow a brief visual pause when the viewer needs to absorb, and match animation speed to the speaker's pace.
 
-Gerak harus terasa merespons suara, bukan berputar acak. Efek visual tidak boleh mengalihkan perhatian dari informasi yang dijelaskan.
+Motion must feel like a response to the voice, not random spinning. Visual effects never pull attention away from the information being explained.
 
-Teks tanpa kata pendukung di voiceover tetap sah (penekanan senyap) — cukup catat alasannya di timeline, jangan dihapus hanya karena gerbang sinkron tidak bisa memverifikasinya.
+Text without a supporting word in the voiceover remains legitimate (silent emphasis) — record the reason in the timeline; do not delete it merely because the sync gate cannot verify it.
 
-## 8. Musik dan mixing audio
+## 8. Music and audio mixing
 
-- Voiceover harus tetap jelas dan dominan. Turunkan musik di bawah suara (ducking) terutama saat informasi penting.
-- Selaraskan beberapa transisi atau aksen animasi dengan beat bila memang pas dengan narasi.
-- Efek suara dipakai hemat dan tidak bersaing dengan suara narator.
-- Jangan mempercepat suara atau memotong kata demi mengejar durasi. Pertahankan ritme dan jeda asli.
-- Musik fade-out halus di akhir, dan audio berakhir tepat di detik terakhir video tanpa ekor suara atau terpotong mendadak.
-- Cegah clipping, distorsi, perubahan volume mendadak, dan keheningan yang tidak disengaja.
+- The voiceover stays clear and dominant. Duck the music under speech, especially during important information.
+- Align some transitions or animation accents to the beat when it genuinely suits the narration.
+- Use sound effects sparingly; they never compete with the narrator.
+- Never speed up speech or cut words to hit a duration. Preserve natural rhythm and pauses.
+- Fade music out smoothly and end audio exactly on the final second — no tail, no abrupt cut.
+- Prevent clipping, distortion, sudden level changes, and unintended silence.
 
-Kalau user tidak punya musik: buat musik latar sederhana yang cocok dengan gaya visual (lihat `RENDER.md`), dan katakan terus terang bahwa itu musik sintetis sederhana. Alternatifnya render tanpa musik dan sarankan user menambahkan musik bebas royalti.
+If the user has no music: build simple background music that fits the visual style (`RENDER.md` §8) and say plainly that it is synthesised music. Alternatively render silent and suggest the user add royalty-free music.
