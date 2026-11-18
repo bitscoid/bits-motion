@@ -22,6 +22,7 @@ Jalankan dulu, dan sesuaikan rencana dengan hasilnya:
 ffmpeg -version | head -1; ffprobe -version | head -1
 ffmpeg -hide_banner -encoders 2>/dev/null | grep -E "(libx264|aac)" || echo "PERINGATAN: encoder libx264/aac tidak ditemukan"
 python3 -c "import PIL, numpy; print('PIL+numpy ok')"
+python3 -c "import faster_whisper; print('ASR word-timestamp: ada')" 2>/dev/null || echo "ASR: tidak ada (pip install faster-whisper; kalau gagal, timing per kata jadi perkiraan -- beri tahu user)"
 node -v
 fc-list | head -20          # font yang tersedia
 which espeak-ng pico2wave   # TTS offline (kemungkinan besar tidak ada)
@@ -41,13 +42,15 @@ Pilih sesuai mood video; satu video maksimal 2–3 family (satu display + satu p
 
 | Mood / gaya | Font | Keterangan |
 |---|---|---|
-| Modern, netral, UI-like | `Poppins` (Regular/SemiBold/Bold), `Inter`, `Montserrat` | Standar aman untuk narasi dan body text |
+| Modern, netral, UI-like | `Poppins` (Regular/SemiBold/Bold), `Inter`, `Montserrat`, `Manrope` | Standar aman untuk narasi dan body text |
 | Playful, doodle, bulat ramah | `Baloo 2`, `Fredoka`, `Quicksand`, `Nunito` | Cocok topik ringan, edukasi santai, anak/muda |
-| Handwriting, catatan tangan | `Caveat`, `Patrick Hand`, `Indie Flower` | Aksen anotasi, garis panah, coretan |
+| Handwriting, catatan tangan | `Caveat`, `Patrick Hand`, `Indie Flower`, `Kalam` | Aksen anotasi, garis panah, coretan |
 | Script elegan/retro | `Pacifico`, `Dancing Script` | Logo kata, judul santai — jangan untuk body text |
-| Impact, tipografi kinetis besar | `Bebas Neue`, `Anton`, `Archivo Black` | Kata kunci besar, hook, angka statistik |
+| Impact, tipografi kinetis besar | `Bebas Neue`, `Anton`, `Archivo Black`, `Oswald` | Kata kunci besar, hook, angka statistik |
+| Editorial/serif tegas | `Fraunces`, `Instrument Serif`, `Libre Caslon Text` | Kutipan, angka besar, topik sejarah/serius — gaya beda dari sans, jangan dicampur berlebihan |
+| Teknis/data/mono | `JetBrains Mono`, `Space Mono`, `Space Grotesk` | Label kecil, angka statistik, nuansa data/teknologi |
 
-Cara pakai: di CSS/Remotion pakai nama family persis seperti di `fc-list` (mis. `"Baloo 2"`, `"Bebas Neue"`); di PIL pakai path file TTF langsung (`~/.local/share/fonts/motion/Baloo2.ttf`). Font variable (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) punya semua bobot dalam satu file — di CSS set `font-weight`; di PIL instantiate bobot dengan `ImageFont.truetype(..., size).set_variation_by_axes([weight])` atau pakai Poppins static untuk bobot pasti.
+Cara pakai: di CSS/Remotion pakai nama family persis seperti di `fc-list` (mis. `"Baloo 2"`, `"Bebas Neue"`); di PIL pakai path file TTF langsung (`~/.local/share/fonts/motion/Baloo2.ttf`). Font variable (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) punya semua bobot dalam satu file — di CSS set `font-weight`; di PIL instantiate bobot dengan `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins tidak variable: pakai file terpisah `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (tidak ada `Poppins.ttf`).
 
 ## 2. Memilih pipeline render
 
@@ -185,11 +188,11 @@ Batas kuota free tier TTS: sekitar **10 request/hari per model** (bukan per meni
 
 ## 4. Menganalisis video referensi
 
-Referensi datang dari user (file atau URL) atau dicari sendiri di Pinterest (sub-bagian di bawah). Setelah file `Referensi Motion Graphic.mp4` ada, analisis:
+Referensi datang dari user (file atau URL) atau dicari sendiri di Pinterest (sub-bagian di bawah). Setelah file `Referensi - Motion Graphic.mp4` ada, analisis:
 
 ```bash
-ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of default=nw=1 "Referensi Motion Graphic.mp4"
-mkdir -p ref && ffmpeg -i "Referensi Motion Graphic.mp4" -vf "fps=2,scale=480:-1" ref/%03d.png
+ffprobe -v error -show_entries stream=width,height,r_frame_rate,duration -of default=nw=1 "Referensi - Motion Graphic.mp4"
+mkdir -p ref && ffmpeg -i "Referensi - Motion Graphic.mp4" -vf "fps=2,scale=480:-1" ref/%03d.png
 
 # Contact sheet satu halaman untuk dibaca cepat
 ffmpeg -framerate 2 -i ref/%03d.png -vf "scale=320:-1,tile=6x5" ref/contact_sheet.png
@@ -197,7 +200,7 @@ ffmpeg -framerate 2 -i ref/%03d.png -vf "scale=320:-1,tile=6x5" ref/contact_shee
 
 Lihat frame hasil ekstrak (bisa disusun jadi contact sheet) untuk membaca palet, tipografi, komposisi, dan ritme potongan. Ambil prinsipnya, bukan salinannya. Orientasi dan rasio layar referensi menjadi default orientasi output.
 
-Kalau referensi berupa URL dari user, unduh dengan `yt-dlp "<url>" -o "Referensi Motion Graphic.mp4"` sebelum analisis.
+Kalau referensi berupa URL dari user, unduh dengan `yt-dlp "<url>" -o "Referensi - Motion Graphic.mp4"` sebelum analisis.
 
 ### Mencari referensi sendiri di Pinterest (kalau user tidak memberi)
 
@@ -207,7 +210,7 @@ Kalau user tidak memberi file/URL referensi (atau memilih "serahkan ke AI"), car
 2. Unduh kandidat satu per satu sampai ada yang berhasil:
 
    ```bash
-   yt-dlp "<url-pin>" -o "Referensi Motion Graphic.mp4"
+   yt-dlp "<url-pin>" -o "Referensi - Motion Graphic.mp4"
    ```
 
 3. Saring sebelum dipakai — cek dengan `ffprobe`, buang kandidat yang: durasi < 5 detik atau > 90 detik, resolusi di bawah 720p, tidak punya stream video, atau isinya tidak berhubungan dengan topik. Kandidat gugur → lanjut ke berikutnya.
@@ -316,7 +319,16 @@ Kalau musik tetap ingin punya fade-out, buat fade di file musiknya sendiri dan p
 
 ### Dua gerbang tambahan: sinkron dan geometri
 
-Keduanya skrip, jalan di atas frame hasil render, dan menangkap kelas cacat yang tidak terlihat saat menonton sekali jalan.
+Keduanya skrip, jalan di atas frame hasil render, dan menangkap kelas cacat yang tidak terlihat saat menonton sekali jalan. Snippet di bawah memakai API contoh (objek `Cam`, fungsi `render_frame`); **prinsipnya yang diikuti, bukan namanya** — sesuaikan dengan pipeline yang dipakai (`RENDER.md` §2). Yang wajib ada di pipeline mana pun:
+
+| Pipeline | Cara menangkap teks | Cara mengambil frame |
+|---|---|---|
+| Python/PIL | bungkus method gambar teks | panggil fungsi render langsung |
+| HTML/Playwright | `page.evaluate` enumerasi `innerText` elemen teks | screenshot per `t` |
+| Remotion/Node | koleksi `useCurrentFrame` → catat elemen di komponen | `renderStill` per `t` |
+| Canvas/JS | bungkus `ctx.fillText` | `toDataURL` per `t` |
+
+Kalau pipeline tidak bisa mencatat teks yang tergambar, gerbang sinkron tidak bisa dijalankan — dalam kasus itu ukur timing dari **tabel waktu** yang dipakai renderer (cari nilai yang memenuhi `t_teks >= t_kata`), dan katakan ke user bahwa verifikasinya lewat tabel, bukan lewat piksel.
 
 **Gerbang sinkron.** Untuk setiap teks kunci, buktikan dua hal: teks sudah ada di `t_kata + 0,10` dan belum ada di `t_kata − 0,15` (jendela bisa disetel, yang penting asimetris — lebih baik telat 0,1 dtk daripada muncul sebelum kata). Tangkap semua teks yang tergambar dengan membungkus pemanggil teks, lalu cocokkan nama teksnya:
 
@@ -342,10 +354,14 @@ Kalau gagal, perbaiki tabel waktu — jangan geser angka di dalam scene (lihat �
 **Gerbang geometri.** Dua cek, keduanya pakai metrik font yang benar-benar dipakai, bukan tebakan:
 
 ```python
-# 1) safe area: tidak ada glyph keluar 3,2% tepi frame
+# 1) safe area: tidak ada glyph keluar 4% tepi frame (nilai sama dengan GUIDE.md §2)
 bb = d.textbbox((px, py), s, font=f, anchor=anchor)
-assert bb[0] > W * 0.032 and bb[2] < W * 0.968
-assert bb[1] > H * 0.032 and bb[3] < H * 0.968
+assert bb[0] > W * 0.04 and bb[2] < W * 0.96
+assert bb[1] > H * 0.04 and bb[3] < H * 0.96
+
+# 1b) keterbacaan: tinggi glyph >= 4% tinggi frame. Kalau gagal, naikkan ukuran font
+#     atau pendekkan barisnya -- jangan diamkan.
+assert (bb[3] - bb[1]) >= H * 0.04, f"teks terlalu kecil: {s}"
 
 # 2) tabrakan antar teks: IoU kotak glyph
 def iou(a, b):
@@ -357,9 +373,14 @@ def iou(a, b):
     return inter / ((a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - inter)
 
 assert iou(bb_a, bb_b) < 0.16
+
+# 3) kontras: rasio WCAG terhadap warna yang benar-benar di belakang teks
+assert ratio(fill, bg_color) >= (3.0 if size >= 32 else 4.5), f"kontras kurang: {s}"
 ```
 
-Teks yang sama digambar dua kali di posisi sama (mis. teks di atas blok sorot) memang IoU 1,0 — itu disengaja, kecualikan pasangan identik. Jalankan kedua gerbang sebelum ekspor, bukan setelah; lebih murah render ulang satu scene daripada satu video.
+**Gerbang kontras** memakai rumus WCAG yang sama dengan `GUIDE.md` §2. Terukur pada palet yang sering dipakai: pasangan tinta-di-krem dan krem-di-gelap lolos jauh di atas 4,5:1, tapi aksen salmon muda di atas krem hanya **1,85:1** — gagal telak untuk teks apa pun. Kalau gerbang ini menolak, jangan turunkan ambangnya: ganti warnanya, atau taruh teks itu di latar gelap, atau beri panel solid di belakang.
+
+Teks yang sama digambar dua kali di posisi sama (mis. teks di atas blok sorot) memang IoU 1,0 — itu disengaja, kecualikan pasangan identik. Jalankan ketiga gerbang sebelum ekspor, bukan setelah; lebih murah render ulang satu scene daripada satu video.
 
 Dua hal yang bikin gerbang ini salah kepikiran:
 - `freezedetect` dengan `n=-60dB` (nilai default) FALSE POSITIVE di motion graphic: decoded frame di rentang "freeze" bisa berubah ribuan piksel per frame (elemen idle, dot napas) tapi filter tetap bilang freeze karena ambangnya terlalu tinggi untuk grafis flat. Selalu pakai `n=0`.

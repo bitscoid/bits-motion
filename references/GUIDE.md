@@ -7,8 +7,10 @@ Baca file ini sebelum membangun scene. Isinya adalah arah eksekusi kreatif (tipo
 2. Tipografi kinetik
 3. Menganimasikan aset
 4. Transisi
-5. Sinkronisasi dengan voiceover
-6. Musik dan mixing audio
+5. Menerjemahkan ide jadi visual
+6. Variasi yang menjaga konsistensi
+7. Sinkronisasi dengan voiceover
+8. Musik dan mixing audio
 
 ## 1. Membaca video referensi
 
@@ -30,9 +32,24 @@ Aturan:
 - Pecah teks jadi frasa pendek. Jangan menampilkan satu paragraf utuh sekaligus. Sorot hanya kata kunci.
 - Pisahkan jelas tingkatan: judul, kata kunci, teks pendukung, label kecil.
 - Hindari huruf besar acak, font yang sulit dibaca, dan dekorasi berlebihan.
-- Jaga safe area: elemen penting minimal ±5% dari tepi frame, supaya aman saat diputar layar penuh atau di-crop platform.
+- Jaga safe area: elemen penting minimal ±4% dari tepi frame. Angka ini satu-satunya angka (gerbang geometri di `RENDER.md` §7 memakai 4%); jangan pakai nilai lain supaya tidak ada dua kebenaran.
 - Ukuran teks terkecil tetap terbaca di resolusi output: minimal sekitar 4% dari tinggi frame (1080p ≈ 43 px).
-- Cek kontras teks vs latarnya di kode (bandingkan luminance). Kurang kontras → kasih panel atau gelapkan area di belakang teks, jangan mengandalkan bayangan tipis.
+- Cek kontras teks vs latarnya di kode, jangan dikira dari nama warna. Ambangnya terukur: rasio kontras minimal **4,5:1** untuk teks kecil dan **3:1** untuk teks besar (≥24 px tebal atau ≥32 px biasa). Hitung dengan rumus WCAG:
+
+```python
+def lum(c):  # c = (r, g, b) 0-255
+    def f(v):
+        v /= 255
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = (f(x) for x in c)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+def ratio(a, b):
+    la, lb = sorted((lum(a), lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+```
+
+  Gagal → beri panel solid di belakang teks atau gelapkan areanya, jangan mengandalkan bayangan tipis. Teks di atas gambar user wajib diukur terhadap piksel yang benar-benar di belakangnya (ambil rata-rata area), bukan terhadap warna dominan gambar.
 - **Centering diukur, bukan diserahkan ke `anchor`.** `anchor="mm"` memusatkan kotak-em font, bukan bentuk glyph — angka, judul kapital, dan teks dengan descender akan terlihat geser di dalam bentuk. Untuk teks yang duduk di dalam objek (angka di lingkaran, label di kartu, teks di dalam blok warna) geser posisinya dengan selisih bbox glyph:
 
 ```python
@@ -65,15 +82,56 @@ Ini pilihan, bukan daftar centang. Pilih yang cocok dengan isi dan jaga kesatuan
 
 Hindari glitch berlebihan, putaran acak, kilatan tanpa alasan, dan transisi yang menutupi penjelasan. Semua transisi harus muat di dalam durasi total yang sudah dihitung. Durasi video tidak boleh melar karena transisi.
 
-## 5. Sinkronisasi dengan voiceover
+## 5. Menerjemahkan ide jadi visual
+
+Tipografi saja membuat video terasa seperti presentasi teks bergerak. Yang membedakan motion graphic bagus adalah **gagasan visual** — satu cara memandang ide yang bisa digambar.
+
+Sebelum membangun scene, untuk setiap poin inti pilih satu **mekanisme visual**, bukan sekadar kata besar di tengah:
+
+| Mekanisme | Pertanyaan yang dijawab | Contoh bentuk |
+|---|---|---|
+| Skala/perbandingan | "seberapa besar?" | satu figur kecil di antara ratusan; angka raksasa vs benda mungil |
+| Akumulasi | "menumpuk jadi apa?" | benda bertambah sampai memenuhi frame (kewajiban, tuntutan, jam) |
+| Transformasi | "berubah jadi apa?" | satu bentuk berubah jadi bentuk lain (mainan → meja belajar) |
+| Pemisahan/belah | "apa yang terpisah?" | satu bentuk terbelah, satu bagian menjauh (anak vs tuntutan) |
+| Jalur/gerak | "ke mana arahnya?" | garis waktu, panah, jalur yang bercabang |
+| Wadah/kapasitas | "muat atau tidak?" | gelas meluap, kotak sesak, kapasitas terisi penuh |
+| Kontras berdampingan | "beda di mana?" | dua keadaan bersebelahan, bukan berurutan |
+| Siklus | "berulang bagaimana?" | lingkaran yang berputar, hari yang sama terulang |
+
+Aturan mainnya:
+- Satu scene cukup satu mekanisme utama. Dua mekanisme bersamaan saling melemahkan.
+- Boleh meminjam idiom visual (grafik batang, jam, tumpukan) tapi jangan membiarkannya jadi ikon generik tanpa arti khusus untuk topik itu.
+- Kalau ide tidak bisa digambar tanpa teks, itu tanda ide belum visual — ganti mekanismenya, jangan menambah teks.
+- Mekanisme boleh berulang sebagai motif antar scene (mis. akumulasi dipakai dua kali), asalkan bentuknya berkembang.
+
+Ini bukan daftar wajib. Kalau ide punya bentuk yang lebih baik di luar tabel, pakai itu.
+
+## 6. Variasi yang menjaga konsistensi
+
+Video 40–60 detik dengan 10–14 scene mudah jatuh jadi "slide yang sama, kata berbeda". Cara menghindarinya tanpa kehilangan kesatuan:
+
+- **Variasikan komposisi**, bukan cuma isi: teks kiri + gambar kanan, teks tengah polos, teks menempel tepi, teks bertumpuk objek, teks sangat kecil di ruang luas.
+- **Variasikan kepadatan**: scene penuh (banyak elemen) diselingi scene lapang (satu elemen, banyak ruang kosong). Kepadatan seragam melelahkan.
+- **Variasikan latar**: terang/gelap boleh bergantian, tapi satu warna aksen tetap dipegang sepanjang video supaya terasa satu keluarga.
+- **Variasikan skala**: satu scene dengan elemen raksasa yang memotong frame akan membuat scene lain terasa lapang, meski ukurannya biasa.
+- **Jaga satu hal tetap**: satu warna aksen, satu font display, satu jenis gerak dominan. Yang tetap itulah yang membuat variasi terasa disengaja, bukan acak.
+
+Periksa hasilnya dengan contact sheet (`ffmpeg ... tile`) sebelum ekspor: kalau 14 thumbnail terlihat seperti template yang sama, variasinya belum cukup.
+
+## 7. Sinkronisasi dengan voiceover
 
 Voiceover adalah acuan timing utama, sedangkan durasi total video ditetapkan di Tahap 4 SKILL.md (durasi suara + pembuka dan penutup, maksimal 60 detik).
+
+Timing per kata diambil dari suara itu sendiri lewat ASR word-timestamp, bukan dari jumlah kata (`RENDER.md` §3). Semua kemunculan teks dibaca dari satu tabel waktu absolut (`RENDER.md` §5), dan hasilnya dibuktikan gerbang sinkron (`RENDER.md` §7): teks tidak boleh muncul sebelum katanya.
 
 Untuk setiap frasa penting: tampilkan teks saat kata itu diucapkan, munculkan aset saat relevan, tekankan kata kunci lewat skala/warna/bobot/posisi/gerak, berikan jeda visual singkat ketika penonton butuh waktu mencerna, dan sesuaikan kecepatan animasi dengan ritme pembicara.
 
 Gerak harus terasa merespons suara, bukan berputar acak. Efek visual tidak boleh mengalihkan perhatian dari informasi yang dijelaskan.
 
-## 6. Musik dan mixing audio
+Teks tanpa kata pendukung di voiceover tetap sah (penekanan senyap) — cukup catat alasannya di timeline, jangan dihapus hanya karena gerbang sinkron tidak bisa memverifikasinya.
+
+## 8. Musik dan mixing audio
 
 - Voiceover harus tetap jelas dan dominan. Turunkan musik di bawah suara (ducking) terutama saat informasi penting.
 - Selaraskan beberapa transisi atau aksen animasi dengan beat bila memang pas dengan narasi.

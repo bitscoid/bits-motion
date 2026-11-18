@@ -1,6 +1,6 @@
 ---
 name: bits-motion-graphics
-description: Pembuat video explainer motion graphics yang durasinya menyesuaikan voiceover, maksimal 60 detik (MP4, H.264 + AAC, 30 fps), dari sebuah topik. Agent menulis naskah voiceover lebih dulu, lalu menawarkan dan menanyakan aset (suara voiceover, gambar pendukung, video referensi, musik latar), menyinkronkan semuanya, me-render MP4, dan memverifikasi durasi file hasil render. Gunakan skill ini setiap kali user ingin membuat video motion graphic, video explainer animasi, kinetic typography, video penjelasan singkat dari sebuah topik, atau menyebut "buatkan motion graphic tentang ...", "video penjelasan singkat", atau mengunggah file bernama "Referensi Motion Graphic", "gambar1/gambar2", "Suara Voiceover" untuk dijadikan video, meskipun user tidak menyebut nama skill ini. Seluruh komunikasi dengan user memakai Bahasa Indonesia.
+description: Pembuat video explainer motion graphics yang durasinya menyesuaikan voiceover, maksimal 60 detik (MP4, H.264 + AAC, 30 fps), dari sebuah topik. Agent menulis naskah voiceover lebih dulu, lalu menawarkan dan menanyakan aset (suara voiceover, gambar pendukung, video referensi, musik latar), menyinkronkan semuanya, me-render MP4, dan memverifikasi durasi file hasil render. Gunakan skill ini setiap kali user ingin membuat video motion graphic, video explainer animasi, kinetic typography, video penjelasan singkat dari sebuah topik, atau menyebut "buatkan motion graphic tentang ...", "video penjelasan singkat", atau mengunggah file bernama "Referensi - Motion Graphic", "gambar1/gambar2", "Suara Voiceover" untuk dijadikan video, meskipun user tidak menyebut nama skill ini. Seluruh komunikasi dengan user memakai Bahasa Indonesia.
 ---
 
 # BITS Motion Graphics
@@ -48,7 +48,7 @@ User memberi topik. Tugas pertama adalah menulis naskah narasi, kecuali user sud
 
 Pedoman naskah:
 - Panjang mengikuti kebutuhan topik. Tidak ada jumlah kata tetap, tetapi jangan melebihi sekitar 140 kata. Kecepatan baca dalam Bahasa Indonesia sekitar 2,5 kata per detik, dan total video maksimal 60 detik (sudah termasuk ±2,5 detik pembuka dan penutup). Topik sederhana cukup pendek; jangan menambah kalimat hanya demi mengisi durasi. Hitung perkiraan durasi suara dan durasi video, lalu tampilkan.
-- Struktur: hook di 3 detik pertama, lalu 2–3 poin inti, lalu penutup yang menancap. Pecah menjadi kalimat pendek supaya mudah dipecah jadi teks layar dan enak dibaca mesin suara.
+- Struktur: buka dengan hal yang paling menahan perhatian (boleh kalimat, boleh pertanyaan, boleh angka), lalu 2–3 poin inti, lalu penutup yang menancap. Hook itu soal efek, bukan soal jumlah detik — 3 detik pertama hanya patokan kasar, bukan syarat. Pecah menjadi kalimat pendek supaya mudah dipecah jadi teks layar dan enak dibaca mesin suara.
 - Bahasa lisan yang jelas dan natural. Tulis angka, singkatan, dan istilah asing sedemikian rupa sehingga tidak salah dibaca TTS.
 - Jangan mengarang fakta. Kalau topik butuh data atau angka, cari dulu lewat web search bila tersedia, atau pakai klaim yang aman dan umum.
 - Panjang naskah dikendalikan di tahap ini. Di tahap 4 voiceover tidak boleh dipotong atau dipercepat, jadi naskah yang akan melewati batas 60 detik harus diperbaiki sekarang.
@@ -75,7 +75,7 @@ Di pesan yang sama dengan naskah (atau setelah user menyetujui naskah), tampilka
 |---|---|---|---|
 | Suara voiceover (rekaman sendiri atau suara AI dari naskah yang sudah disetujui) | `Suara Voiceover` | Sangat disarankan, karena jadi acuan timing | Lihat bagian "Tanpa voiceover" di bawah |
 | Gambar, ilustrasi, ikon pendukung | `gambar1`, `gambar2`, `gambar3`, dst. | Opsional | AI membuat elemen grafis motion graphic sendiri |
-| Video referensi gaya | `Referensi Motion Graphic` | Opsional | AI cari sendiri di Pinterest sesuai topik (lihat `references/RENDER.md` §4); kalau gagal, tanya user |
+| Video referensi gaya | `Referensi - Motion Graphic` | Opsional | AI cari sendiri di Pinterest sesuai topik (lihat `references/RENDER.md` §4); kalau gagal, tanya user |
 | Musik latar | `Musik Latar` | Opsional | AI membuat musik latar sederhana, atau render tanpa musik |
 | Orientasi layar | — | Tanyakan | Default landscape 1920×1080 |
 
@@ -121,8 +121,10 @@ Ritme dibuat bervariasi: pembuka yang langsung menarik perhatian, bagian tengah 
 ### Tahap 6 — Produksi dan render
 
 Baca dua file referensi sebelum membangun apa pun:
-- `references/GUIDE.md` untuk arah kreatif, tipografi, animasi aset, transisi, dan mixing audio.
+- `references/GUIDE.md` untuk arah kreatif, tipografi, animasi aset, transisi, **menerjemahkan ide jadi visual (§5), variasi komposisi antar scene (§6)**, dan mixing audio.
 - `references/RENDER.md` untuk cek lingkungan, pipeline render, perintah ffmpeg, dan cara verifikasi.
+
+Sebelum menulis kode scene, pastikan setiap poin inti punya satu mekanisme visual yang bisa digambar (`GUIDE.md` §5). Kalau rencananya masih berupa "tampilkan kata besar di tengah" untuk semua scene, gagasannya belum jadi.
 
 ### Tahap 7 — Kontrol kualitas dan serah terima
 
@@ -135,7 +137,9 @@ Periksa file MP4 hasil ekspor dari awal sampai akhir, bukan hanya timeline edito
 5. Musik mendukung dan suara tetap dominan.
 6. Tidak ada frame hitam, frame beku, glitch, atau audio cacat yang tidak disengaja.
 7. MP4 bisa diputar. Durasi aktual sama dengan durasi total yang dihitung di Tahap 4 (dan tidak lebih dari 60 detik), jumlah frame = durasi × 30, 30 fps, codec dan resolusi sesuai spesifikasi, dan tidak ada konten setelah detik terakhir. Semuanya dibuktikan dari metadata file hasil ekspor.
-8. Tiga gerbang skrip di `references/RENDER.md` §7 lulus: sinkron (tidak ada teks yang muncul sebelum katanya), geometri (safe area + tidak ada teks bertabrakan), dan ekor audio (tidak ada keheningan tak sengaja sampai detik terakhir).
+8. Tiga gerbang skrip di `references/RENDER.md` §7 lulus: sinkron (tidak ada teks yang muncul sebelum katanya), geometri (safe area, keterbacaan ukuran, tabrakan, kontras), dan ekor audio (tidak ada keheningan tak sengaja sampai detik terakhir).
+
+Cek kreatifnya juga, tapi dengan mata, bukan skrip: buka contact sheet hasil ekspor (`ffmpeg -i output.mp4 -vf "fps=1,scale=300:-1,tile=6x8" sheet.png`). Kalau semua thumbnail terlihat seperti satu template dengan kata berbeda, variasi komposisi belum cukup (`GUIDE.md` §6) — perbaiki sebelum serah terima.
 
 Perbaiki masalah yang ditemukan sebelum menyerahkan file. Serahkan MP4 sesuai lingkungan: pakai mekanisme serah file yang tersedia (tool khusus bila ada) atau langsung kasih path file. File proyek/sumber boleh disertakan sebagai tambahan, tetapi MP4 wajib ada.
 
