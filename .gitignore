@@ -1,2 +1,30 @@
+# Byte-compiled
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+
+# Render intermediates — safe to delete, never commit
+work/
+frames/
+ref/
+check/
+
+# Local assets
+assets/
+audio/
+output/
+
+# Environment
+.env
+.venv/
+venv/
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Tool caches
+.ruff_cache/
+.pytest_cache/
