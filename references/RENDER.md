@@ -33,6 +33,30 @@ case "$NC" in 200|403|404) echo "network: OK (HTTP $NC)";; *) echo "network: PRO
 
 Network access is often restricted. Check what actually works: if `pip` and `npm` run, extra fonts can come from `@fontsource/<font-name>`; if external downloads are blocked, use fonts already on the system. The ffmpeg version dictates which options are legal (see §6).
 
+### Vision capability (measured, never assumed)
+
+Stages 4 and 7 need the model to open an image. Provider metadata is not evidence: on one measured gateway, 15 of 72 models advertising `vision: true` returned an empty `content` because the router stripped the image. Probe with one real image before relying on it:
+
+```bash
+# known-content probe: white 800x400, blue square, red circle, text X7-KILO
+python3 - <<'PY'
+from PIL import Image, ImageDraw
+im = Image.new("RGB", (400, 200), "white"); d = ImageDraw.Draw(im)
+d.rectangle([20, 20, 120, 120], fill=(0, 0, 255))
+d.ellipse([140, 20, 240, 120], fill=(255, 0, 0))
+d.text((30, 150), "X7-KILO", fill="black")
+im.resize((800, 400), Image.LANCZOS).save("work/vision-probe.png")
+PY
+```
+
+Then ask the main session to read `work/vision-probe.png` and report the text and both shapes. Pass = it names `X7-KILO`, a blue square, and a red circle. Fail = empty reply, a refusal, or a placeholder such as `[image omitted: ...]`.
+
+- **Pass** → keep every image call in the main session. No subagent.
+- **Fail** → delegate the image call to the `vision` subagent, once, and continue in the main session with its text answer. The subagent owns its own failover chain; never build a second one here, never retry the main model, never loop.
+- **Both fail** → say so plainly and ask the user for a text description. Do not substitute guesses for what the picture shows.
+
+Batch several images into one delegated call. Timing, scene code, rendering, and every QC number stay in the main session — the subagent returns a description, not a decision. Delete `work/vision-probe.png` with the rest of `work/` at cleanup (§10).
+
 ### Fonts ready to use (`~/.local/share/fonts/motion/`)
 
 **This catalogue is a starting point, not a menu.** If the topic needs typography that isn't here, download it (next subsection). Picking an installed font merely because it exists is the fastest route to making every video look the same.

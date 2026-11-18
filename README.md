@@ -71,6 +71,8 @@ A rule that passes ① but fails ② is a restriction, not a standard. Rejected 
 
 **One skill, no shared library.** The agent writes the render code and the QC checks per project. Every video gets code shaped to its own content instead of being squeezed into a shared engine.
 
+**Vision routing.** Every image call — asset verification, reference frames, QC contact sheets — is attempted by the main model first. Provider metadata is not trusted: a model that advertises `vision: true` can still return empty content. On a real fail (`content` empty, refusal, or an `[image omitted: ...]` placeholder) that one call goes to the `vision` subagent, which owns a failover chain of models proven to read images. Text, timing, scene code, rendering and every number stay in the main session. Detail in `SKILL.md` → *Vision routing*, probe in `RENDER.md` §1.
+
 ---
 
 ## 🎯 What it actually enforces

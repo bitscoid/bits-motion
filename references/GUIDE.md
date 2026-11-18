@@ -18,6 +18,8 @@ A reference is a quality bar, not a mould. What transfers is the principle — w
 
 Look at: palette, typographic hierarchy, how text and image stack, cut rhythm, transition types, use of shadow and depth, and how motion relates to sound.
 
+"Look at" means the model actually opens the frames. If the main model cannot see images — empty `content`, a refusal, or an `[image omitted: ...]` placeholder — hand all reference frames to the `vision` subagent in one call and work from its description (`SKILL.md` → *Vision routing*). Never describe a reference you have not seen; say so instead.
+
 Forbidden: copying shots one by one, reusing the exact composition, placing text in the same positions, or reproducing the animation and transition order frame by frame. The goal is work that is original and tighter than its reference.
 
 ## 2. Kinetic typography
@@ -179,7 +181,7 @@ A video with a dozen or more scenes slides easily into "same layout, different w
 - **Vary scale**: one scene with an oversized element bleeding off-frame makes the rest feel airy even at normal size.
 - **Hold one thing constant**: one accent colour, one display face, one dominant motion type. That constant is what makes the variation feel intentional rather than random.
 
-Check the result with a contact sheet (`ffmpeg ... tile`) before export: if every thumbnail follows the same pattern, variation is insufficient.
+Check the result with a contact sheet (`ffmpeg ... tile`) before export: if every thumbnail follows the same pattern, variation is insufficient. A model without vision delegates that look to the `vision` subagent — one call, then judge from the returned description.
 
 **Make the check quantitative.** Rate each scene on four axes and keep the vector beside the timeline; three consecutive scenes on the same vector is the failure, not two.
 

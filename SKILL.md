@@ -13,6 +13,31 @@ Turn one topic into a finished motion-graphics video (MP4) — not a storyboard,
 
 Execute every stage in the main session: script, assets, sync, render, QC. Do not delegate any part of the workflow to a subagent, task tool, or another agent.
 
+**One exception: looking at an image.** Reading a picture is not a stage. Delegate only the call that turns an image into text, and only when the main model cannot see it — see *Vision routing* below.
+
+## Vision routing
+
+Asset analysis (stage 4), reference-frame reading (stage 4), and QC contact sheets (stage 7) all need the model to open an image. Route the call by what the model can actually do, not by what its metadata claims.
+
+1. **Try it directly first.** The main session reads the image itself. Most runs stop here; no subagent, no extra hop.
+2. **Recognise the failure.** The model cannot see, whatever the model list says. Treat any of these as *no vision*:
+   - `content` comes back **empty** with no tool calls;
+   - the reply says it cannot see the image;
+   - the image arrives replaced by a placeholder such as `[image omitted: ...]`.
+
+   Empty `content` **is** the signal. A provider that advertises `vision: true` can still strip the image and answer nothing — measured on this gateway, 15 of 72 flagged models did exactly that.
+3. **Then delegate, once.** Hand the single image call to the `vision` subagent and use its text answer:
+   ```
+   task(subagent_type: "vision", prompt: "Read <path>. Report: exact text, layout, colours, and what it depicts. One paragraph.")
+   ```
+   The `vision` subagent already runs a failover chain over models proven to read images, so do not pick a model yourself, do not retry the main model, and do not build a second chain inside this skill.
+4. **Never loop.** One direct attempt, one delegated attempt. If both fail, tell the user the image could not be read and ask for a text description — do not keep swapping models.
+5. **What still stays in the main session:** writing the script, timing, scene code, rendering, and every QC number. The subagent returns a *description*; the decisions built on it are still yours. Never hand the whole stage to a subagent.
+
+Use the same rule for a supplied recording's metadata, a PDF, or a screenshot the user pastes: attempt, detect, delegate once.
+
+Batch when there are several images in one stage — a single `vision` call naming all paths beats one call per file.
+
 ## Fixed specifications
 
 | Parameter | Value |
@@ -265,7 +290,7 @@ The table above is for your own reference. What reaches the user is the Indonesi
 **Visual material — three sources, pick per scene.**
 
 1. **User images.** When supplied, build those visuals from them and adapt them to the voiceover. Never swap them for generic stock.
-2. **Images you find and download.** When the script calls for something concrete (a place, an object, a document, a historical photo), search the web for a suitable image, download it, and verify it: correct subject, licence allows use, resolution at least the output resolution, no watermark. Save to `assets/image-01.png` (next number), record the source URL in the delivery message, and never pass off a found image as the user's.
+2. **Images you find and download.** When the script calls for something concrete (a place, an object, a document, a historical photo), search the web for a suitable image, download it, and verify it: correct subject, licence allows use, resolution at least the output resolution, no watermark. Save to `assets/image-01.png` (next number), record the source URL in the delivery message, and never pass off a found image as the user's. Verifying "correct subject" means looking at it — see *Vision routing*.
 3. **Code-drawn graphics.** Shapes, icons, vector illustration, typography, diagrams — always available and always yours.
 
 Mixing them is normal and often best: a downloaded photograph with code-drawn annotations on top, a code-drawn diagram with one user image inside it. Choose per scene by what communicates fastest. Be honest about which is which: code-drawn graphics are not photographs, and a found image is not the user's own.
@@ -302,7 +327,7 @@ Pilihannya:
    ```
 
    Write the result to `work/words.json` either way (`references/RENDER.md` §3). Every later stage reads that file: the timeline, the sync gate, and the optional subtitle track.
-4. With a reference video, extract frames and read its visual language: palette, typography, composition, cut rhythm, transition types, depth. Measure the cut rhythm (`references/RENDER.md` §4) instead of describing it from impression. Reference is inspiration only. Never copy shots, text placement, or animation order.
+4. With a reference video, extract frames and read its visual language: palette, typography, composition, cut rhythm, transition types, depth. Reading those frames is an image call — see *Vision routing*, and batch all frames into one delegated call if the main model cannot see them. Measure the cut rhythm (`references/RENDER.md` §4) instead of describing it from impression. Reference is inspiration only. Never copy shots, text placement, or animation order.
 
    Report what you found and what you will take, in Indonesian:
 
@@ -388,7 +413,7 @@ Inspect the exported MP4 from start to finish, not just the timeline editor:
 7. The MP4 plays. Actual duration equals the stage-4 total (never over the active cap), frame count = duration × 30, 30 fps, codec and resolution per spec, nothing after the final second, and the cap in use is stated (60 s portrait, 300 s landscape, or the number the user approved). All of it proven from the exported file's metadata.
 8. Gates in `references/RENDER.md` §7 pass: sync (no text appears before its word), geometry (safe area, size legibility, collision, contrast), audio (no dead air inside the speech region; music present in the tail when music exists; mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP), and repetition pattern (flag only, your call). Prove it with numbers and state them in the delivery message.
 
-Check the creative side with your eyes, not a script: open a contact sheet of the export:
+Check the creative side with your eyes, not a script: open a contact sheet of the export. If the main model cannot see it, hand the sheet to the `vision` subagent — one call, *Vision routing*:
 
 ```bash
 mkdir -p work/check
