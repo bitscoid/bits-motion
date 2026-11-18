@@ -125,7 +125,7 @@ Ini bukan daftar wajib. Kalau ide punya bentuk yang lebih baik di luar tabel, pa
 
 ## 6. Variasi yang menjaga konsistensi
 
-Video 40–60 detik dengan 10–14 scene mudah jatuh jadi "slide yang sama, kata berbeda". Cara menghindarinya tanpa kehilangan kesatuan:
+Video pendek dengan belasan scene mudah jatuh jadi "slide yang sama, kata berbeda". Cara menghindarinya tanpa kehilangan kesatuan:
 
 - **Variasikan komposisi**, bukan cuma isi: teks kiri + gambar kanan, teks tengah polos, teks menempel tepi, teks bertumpuk objek, teks sangat kecil di ruang luas.
 - **Variasikan kepadatan**: scene penuh (banyak elemen) diselingi scene lapang (satu elemen, banyak ruang kosong). Kepadatan seragam melelahkan.
@@ -137,7 +137,7 @@ Periksa hasilnya dengan contact sheet (`ffmpeg ... tile`) sebelum ekspor: kalau 
 
 ## 7. Sinkronisasi dengan voiceover
 
-Voiceover adalah acuan timing utama, sedangkan durasi total video ditetapkan di Tahap 4 SKILL.md (durasi suara + pembuka dan penutup, maksimal 60 detik).
+Voiceover adalah acuan timing utama, sedangkan durasi total video ditetapkan di Tahap 4 SKILL.md (durasi suara + pembuka dan penutup, dibatasi `MAX_DUR` yang default-nya 60 detik).
 
 Timing per kata diambil dari suara itu sendiri lewat ASR word-timestamp, bukan dari jumlah kata (`RENDER.md` §3). Semua kemunculan teks dibaca dari satu tabel waktu absolut (`RENDER.md` §5), dan hasilnya dibuktikan gerbang sinkron (`RENDER.md` §7): teks tidak boleh muncul sebelum katanya.
 

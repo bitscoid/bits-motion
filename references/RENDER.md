@@ -166,7 +166,7 @@ Kalau VO di-`adelay` saat mixing (mis. mulai detik 1), semua waktu ASR harus dit
 
 Catatan ekstensi: contoh di bawah memakai `Suara Voiceover.mp3`, tapi sesuaikan dengan file yang nyata ada — hasil generate TTS otomatis berupa `Suara Voiceover.wav`, rekaman user bisa .mp3/.wav/.m4a.
 
-Kalau durasi total hasil hitungan (durasi voiceover + ±2,5 detik) melebihi 60 detik, berhenti dan tanya user (lihat Tahap 4 di SKILL.md).
+Kalau durasi total hasil hitungan (durasi voiceover + ±2,5 detik) melebihi `MAX_DUR` (default 60 detik), berhenti dan tanya user (lihat Tahap 4 di SKILL.md).
 
 Kalau user tidak punya voiceover, urutan pilihannya:
 
@@ -286,13 +286,16 @@ Kualitas hasil cari sendiri tidak terkontrol. Wajib: sebut ke user video referen
 
 Durasi video mengikuti voiceover. Hitung dulu durasi total dan jumlah frame (aturannya ada di Tahap 4 SKILL.md: suara + ±1 detik pembuka + ±1,5 detik penutup, dibulatkan ke atas ke detik penuh):
 
+TENTUKAN dulu batasnya. `MAX_DUR` default 60; naikkan hanya kalau user meminta sendiri secara eksplisit.
+
 ```bash
+MAX_DUR=60                      # batas default; ganti hanya atas permintaan user
 VO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "Suara Voiceover.mp3")
 DUR=$(awk -v v="$VO_DUR" 'BEGIN{t=v+2.5; d=int(t); if (d<t) d++; print d}')
 FRAMES=$((DUR*30))
 FADE_ST=$(awk -v d="$DUR" 'BEGIN{print d-2.5}')
-echo "voiceover=$VO_DUR  total=$DUR detik  frame=$FRAMES"
-[ "$DUR" -gt 60 ] && echo "MELEBIHI 60 DETIK: berhenti dan tanya user"
+echo "voiceover=$VO_DUR  total=$DUR detik  frame=$FRAMES  batas=$MAX_DUR"
+awk -v d="$DUR" -v m="$MAX_DUR" 'BEGIN{if(d>m) print "MELEBIHI BATAS "m" DETIK: berhenti dan tanya user"}'
 ```
 
 Pakai `$DUR` dan `$FRAMES` itu untuk seluruh render (jumlah frame yang digambar, timeline, dan ekspor). Voiceover digeser mulai di detik ke-1 (`adelay`), di-pad sampai akhir video, dan musik diloop lalu dipotong sepanjang video, diturunkan volumenya, di-duck saat ada suara.
@@ -328,7 +331,7 @@ Catatan:
 - Tanpa musik: lewati langkah 2, dan di langkah 3 cukup `[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,asetpts=PTS-STARTPTS,afade=t=out:st=<DUR-0.5>:d=0.5[aout]` (hitung `DUR-0.5` dengan `awk` seperti `FADE_ST`).
 - Tanpa voiceover (draf): gunakan hanya musik, dan beri label draf.
 - Kalau yang diinput video mentah dan bukan urutan gambar, tetap paksa `-r 30` dan `-frames:v $FRAMES`.
-- Kalau user menentukan target durasi sendiri, ganti nilai `DUR` dengan target itu (selama voiceover muat dan tidak lebih dari 60), lalu hitung `FRAMES` dan `FADE_ST` dengan rumus yang sama.
+- Kalau user menentukan target durasi sendiri, ganti `DUR` dengan target itu (selama voiceover muat) dan set `MAX_DUR` minimal sebesar target itu, lalu hitung `FRAMES` dan `FADE_ST` dengan rumus yang sama.
 
 ## 7. Verifikasi file hasil ekspor
 

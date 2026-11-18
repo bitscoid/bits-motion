@@ -1,6 +1,6 @@
 ---
 name: bits-motion-graphics
-description: Pembuat video explainer motion graphics yang durasinya menyesuaikan voiceover, maksimal 60 detik (MP4, H.264 + AAC, 30 fps), dari sebuah topik. Agent menulis naskah voiceover lebih dulu, lalu menawarkan dan menanyakan aset (suara voiceover, gambar pendukung, video referensi, musik latar), menyinkronkan semuanya, me-render MP4, dan memverifikasi durasi file hasil render. Gunakan skill ini setiap kali user ingin membuat video motion graphic, video explainer animasi, kinetic typography, video penjelasan singkat dari sebuah topik, atau menyebut "buatkan motion graphic tentang ...", "video penjelasan singkat", atau mengunggah file bernama "Referensi - Motion Graphic", "gambar1/gambar2", "Suara Voiceover" untuk dijadikan video, meskipun user tidak menyebut nama skill ini. Seluruh komunikasi dengan user memakai Bahasa Indonesia.
+description: Pembuat video explainer motion graphics yang durasinya menyesuaikan voiceover, default maksimal 60 detik (bisa lebih panjang bila user meminta sendiri), MP4 H.264 + AAC 30 fps, dari sebuah topik. Agent menulis naskah voiceover lebih dulu, lalu menawarkan dan menanyakan aset (suara voiceover, gambar pendukung, video referensi, musik latar), menyinkronkan semuanya, me-render MP4, dan memverifikasi durasi file hasil render. Gunakan skill ini setiap kali user ingin membuat video motion graphic, video explainer animasi, kinetic typography, video penjelasan singkat dari sebuah topik, atau menyebut "buatkan motion graphic tentang ...", "video penjelasan singkat", atau mengunggah file bernama "Referensi - Motion Graphic", "gambar1/gambar2", "Suara Voiceover" untuk dijadikan video, meskipun user tidak menyebut nama skill ini. Seluruh komunikasi dengan user memakai Bahasa Indonesia.
 ---
 
 # BITS Motion Graphics
@@ -17,13 +17,14 @@ Skill ini wajib dijalankan langsung di sesi utama (main session), bukan lewat su
 
 | Parameter | Nilai |
 |---|---|
-| Durasi file akhir | Mengikuti voiceover: durasi suara + ±1 detik pembuka + ±1,5 detik penutup, dibulatkan ke atas ke detik penuh. Tidak ada durasi minimum. **Batas atas default 60 detik**, bisa dilonggarkan hanya kalau user memintanya sendiri secara eksplisit (lihat catatan di bawah tabel) |
+| Durasi file akhir | Mengikuti voiceover: durasi suara + ±1 detik pembuka + ±1,5 detik penutup, dibulatkan ke atas ke detik penuh. Tidak ada durasi minimum |
+| Batas durasi (`MAX_DUR`) | Default **60 detik**, dikunci. Naikkan hanya bila user meminta sendiri secara eksplisit |
 | Frame rate | 30 fps, constant frame rate |
 | Jumlah frame | Durasi total (detik) × 30. Contoh: 43 detik = 1.290 frame |
 | Format | MP4, video H.264, audio AAC |
 | Resolusi | Ikuti orientasi video referensi. Tanpa referensi: tanyakan, dan kalau tidak dijawab pakai 1920×1080 (landscape). Portrait = 1080×1920 |
 
-Tidak ada durasi tetap. Audio yang menentukan panjang video. Batas 60 detik adalah **default yang dikunci**: jangan melonggarkannya atas inisiatif sendiri. Kalau user meminta durasi lebih panjang secara eksplisit (mis. "boleh 90 detik"), ikuti dan sebutkan batas baru itu di pesan serah terima. Kalau tanpa permintaan eksplisit VO melewati 60 detik, berhenti dan tanya — jangan diam-diam memanjangkan video, karena format pendek itulah identitas skill ini.
+Tidak ada durasi tetap. Audio yang menentukan panjang video. `MAX_DUR` default 60 detik dan **dikunci**: jangan melonggarkannya atas inisiatif sendiri. Kalau user meminta durasi lebih panjang secara eksplisit (mis. "boleh 90 detik"), set `MAX_DUR` ke angka itu dan sebutkan di pesan serah terima. Kalau tanpa permintaan eksplisit VO melewati `MAX_DUR`, berhenti dan tanya — jangan diam-diam memanjangkan video, karena format pendek itulah identitas skill ini.
 
 Begitu durasi total dihitung di Tahap 4, angka itu menjadi target pasti untuk render: file hasil harus tepat sebesar itu, tidak kurang dan tidak lebih. Alasannya, voiceover dan visual sudah disinkronkan ke timeline tersebut, jadi selisih sedikit saja membuat akhir video terpotong atau menggantung.
 
@@ -59,7 +60,7 @@ Ikuti urutan ini. Jangan loncat ke render sebelum tahap 1–3 selesai.
 User memberi topik. Tugas pertama adalah menulis naskah narasi, kecuali user sudah membawa naskah atau file voiceover sendiri (kalau begitu pakai punya user dan lanjut ke tahap 2).
 
 Pedoman naskah:
-- Panjang mengikuti kebutuhan topik. Tidak ada jumlah kata tetap, tetapi jangan melebihi sekitar 140 kata. Kecepatan baca dalam Bahasa Indonesia sekitar 2,5 kata per detik, dan total video mengikuti batas yang berlaku (default 60 detik, sudah termasuk ±2,5 detik pembuka dan penutup). Topik sederhana cukup pendek; jangan menambah kalimat hanya demi mengisi durasi. Hitung perkiraan durasi suara dan durasi video, lalu tampilkan.
+- Panjang mengikuti kebutuhan topik, dihitung dari batas yang berlaku: **±2,5 kata per detik**, dan total video mengikuti batas yang berlaku (default 60 detik, sudah termasuk ±2,5 detik pembuka dan penutup). Jadi patokan kasarnya ±140 kata untuk 60 detik — angka itu turunan, bukan aturan; kalau user meminta 90 detik, targetnya ±215 kata. Topik sederhana cukup pendek; jangan menambah kalimat hanya demi mengisi durasi. Hitung perkiraan durasi suara dan durasi video, lalu tampilkan.
 - Struktur: buka dengan hal yang paling menahan perhatian (boleh kalimat, boleh pertanyaan, boleh angka), lalu 2–3 poin inti, lalu penutup yang menancap. Hook itu soal efek, bukan soal jumlah detik — 3 detik pertama hanya patokan kasar, bukan syarat. Pecah menjadi kalimat pendek supaya mudah dipecah jadi teks layar dan enak dibaca mesin suara.
 - Bahasa lisan yang jelas dan natural. Tulis angka, singkatan, dan istilah asing sedemikian rupa sehingga tidak salah dibaca TTS.
 - Jangan mengarang fakta. Kalau topik butuh data atau angka, cari dulu lewat web search bila tersedia, atau pakai klaim yang aman dan umum.
@@ -120,7 +121,7 @@ Durasi video final dihitung dari audio yang sebenarnya:
 Contoh: voiceover 37,3 detik → 37,3 + 2,5 = 39,8 → video 40 detik (1.200 frame). Voiceover 52,6 detik → 55,1 → video 56 detik (1.680 frame).
 
 - **Durasi total dalam batas**: lanjut. Angka hasil hitungan menjadi durasi pasti video. Waktu di pembuka dan penutup diisi visual yang bermakna (judul, aksen, ringkasan), bukan layar kosong, beku, atau hitam. Suara tidak diregangkan.
-- **Durasi total melewati batas** (batas default 60 detik, artinya voiceover lebih dari sekitar 57 detik): berhenti sebelum render. Jangan memotong kata, mempercepat suara, atau memampatkan jeda. Beri tahu user bahwa voiceover melewati batas, sebutkan perkiraan angkanya, dan minta keputusan: naskah dipersingkat, voiceover dibuat ulang, atau user menyetujui batas baru yang lebih panjang.
+- **Durasi total melewati batas** (`MAX_DUR`, default 60 detik — artinya voiceover lebih dari sekitar `MAX_DUR - 2,5` detik): berhenti sebelum render. Jangan memotong kata, mempercepat suara, atau memampatkan jeda. Beri tahu user bahwa voiceover melewati batas, sebutkan perkiraan angkanya, dan minta keputusan: naskah dipersingkat, voiceover dibuat ulang, atau user menyetujui batas baru yang lebih panjang.
 - **User menyebut target durasi sendiri**: pakai target itu sebagai durasi total kalau voiceover muat (suara + pembuka + penutup ≤ target). Target yang lebih panjang dari default sah selama user sendiri yang menyebutkannya.
 
 ### Tahap 5 — Rencanakan timeline (internal)
