@@ -241,29 +241,37 @@ echo "voiceover=$VO_DUR  total=$DUR detik  frame=$FRAMES"
 [ "$DUR" -gt 60 ] && echo "MELEBIHI 60 DETIK: berhenti dan tanya user"
 ```
 
-Pakai `$DUR` dan `$FRAMES` itu untuk seluruh render (jumlah frame yang digambar, timeline, dan ekspor). Voiceover digeser mulai di detik ke-1 (`adelay`), di-pad sampai akhir video, dan musik diloop lalu dipotong sepanjang video, diturunkan volumenya, di-duck saat ada suara, dan fade-out 2,5 detik di akhir.
+Pakai `$DUR` dan `$FRAMES` itu untuk seluruh render (jumlah frame yang digambar, timeline, dan ekspor). Voiceover digeser mulai di detik ke-1 (`adelay`), di-pad sampai akhir video, dan musik diloop lalu dipotong sepanjang video, diturunkan volumenya, di-duck saat ada suara.
 
-Contoh lengkap (voiceover + musik):
+**Tiga langkah, jangan digabung jadi satu `filter_complex`.** Menggabungkan `loudnorm` bersama `apad` dalam satu rantai membuat ekor audio mati: filter loudnorm ikut memproses bagian padding sehingga ekornya jatuh ke −91 dB (terukur pada contoh satu-rantai yang dulu ada di sini: `silence_start 40,86` di video 43 dtk). Karena itu pisahkan:
 
 ```bash
-ffmpeg -y -framerate 30 -i frames/%05d.png \
-  -i "Suara Voiceover.mp3" \
-  -stream_loop -1 -i "Musik Latar.mp3" \
+# 1) normalisasi voiceover ke file sendiri
+ffmpeg -y -i "Suara Voiceover.mp3" -af "loudnorm=I=-16:TP=-1.5:LRA=11" -ar 48000 vo_norm.wav
+
+# 2) rapikan musik di file sendiri: level + fade-out. Jangan beri afade=t=in —
+#    musik mulai dari senyap akan terbaca sebagai keheningan tak sengaja oleh gerbang §7.
+ffmpeg -y -i "Musik Latar.mp3" -af "volume=0.40,afade=t=out:st=$FADE_ST:d=2.5" -ar 48000 musik_mix.wav
+
+# 3) baru gabungkan: adelay + apad + duck + amix
+ffmpeg -y -framerate 30 -i frames/%05d.png -i vo_norm.wav -i musik_mix.wav \
   -filter_complex "\
-[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,asetpts=PTS-STARTPTS,loudnorm=I=-16:TP=-1.5:LRA=11,asplit=2[vo1][vo2];\
-[2:a]atrim=0:$DUR,asetpts=PTS-STARTPTS,volume=0.35,afade=t=out:st=$FADE_ST:d=2.5[bg];\
+[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,asetpts=PTS-STARTPTS,asplit=2[vo1][vo2];\
+[2:a]atrim=0:$DUR,asetpts=PTS-STARTPTS[bg];\
 [bg][vo1]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[duck];\
-[duck][vo2]amix=inputs=2:duration=longest:dropout_transition=0,volume=2,alimiter=limit=0.85:level=0[aout]" \
+[duck][vo2]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.85:level=0[aout]" \
   -map 0:v -map "[aout]" \
   -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -r 30 -frames:v $FRAMES \
   -c:a aac -b:a 192k -ar 48000 -t $DUR \
   -movflags +faststart "output.mp4"
 ```
 
+`FADE_ST` dihitung dari durasi video, bukan dari durasi musik: `$FADE_ST` = `DUR - 2.5` (resep `awk` di atas sudah begitu). Fade harus selesai sebelum detik terakhir, tapi jangan sampai musik menyentuh nol persis di frame terakhir — sisa −25 dB di ekor masih lolos gerbang, nol persis tidak.
+
 Catatan:
-- `loudnorm` menyetaraan loudness voiceover (target I=-16 LUFS, TP=-1,5) supaya level rekaman user dan hasil TTS konsisten. Filter ini bekerja pada 192 kHz secara internal; `-ar 48000` pada output sudah mengembalikan sample rate.
-- `amix` pada ffmpeg 6.x selalu menormalkan dengan membagi volume per jumlah input, makanya ada `volume=2` untuk mengembalikan level. Opsi `normalize=0` baru ada di ffmpeg 7.0 ke atas; pakai hanya kalau `ffmpeg -version` menunjukkan versi itu.
-- Tanpa musik: hapus input musik dan cabang `[bg]`, lalu pakai `[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,loudnorm=I=-16:TP=-1.5:LRA=11,afade=t=out:st=<DUR-0.5>:d=0.5[aout]` (hitung `DUR-0.5` dengan `awk` seperti `FADE_ST`).
+- `loudnorm` menyetaraan loudness voiceover (target I=-16 LUFS, TP=-1,5) supaya level rekaman user dan hasil TTS konsisten. Filter ini bekerja pada 192 kHz secara internal; `-ar 48000` pada langkah 1 sudah mengembalikan sample rate.
+- `normalize=0` butuh ffmpeg 7.0+. Di 6.x hapus `normalize=0` dan pakai `volume=2` — hasilnya setara (terukur identik di 7.1: −18,5 dB keduanya). Jangan pasang keduanya sekaligus: `normalize=0` + `volume=2` menghasilkan max 0,0 dB alias clipping.
+- Tanpa musik: lewati langkah 2, dan di langkah 3 cukup `[1:a]adelay=1000:all=1,apad=whole_dur=$DUR,atrim=0:$DUR,asetpts=PTS-STARTPTS,afade=t=out:st=<DUR-0.5>:d=0.5[aout]` (hitung `DUR-0.5` dengan `awk` seperti `FADE_ST`).
 - Tanpa voiceover (draf): gunakan hanya musik, dan beri label draf.
 - Kalau yang diinput video mentah dan bukan urutan gambar, tetap paksa `-r 30` dan `-frames:v $FRAMES`.
 - Kalau user menentukan target durasi sendiri, ganti nilai `DUR` dengan target itu (selama voiceover muat dan tidak lebih dari 60), lalu hitung `FRAMES` dan `FADE_ST` dengan rumus yang sama.
@@ -389,8 +397,11 @@ Pakai maksimal beberapa kali per video, volumenya selalu di bawah voiceover, dan
 - **Teks Bahasa Indonesia terpotong di tepi**: ukur lebar teks dengan fungsi pengukur font, bukan menebak.
 - **File sangat besar**: naikkan CRF (misalnya 20–22), jangan menurunkan resolusi.
 - **`alimiter` dipasang tapi `max_volume` tetap 0 dB**: opsi `level` bawaan alimiter adalah 1 (auto-level) — setelah membatasi, sinyal dinormalisasi BALIK ke 0 dBFS. Wajib `alimiter=limit=0.85:level=0`. Terbukti: `limit=0.79` saja tetap menghasilkan max 0,0 dB; dengan `level=0` hasilnya -1,3 dB.
-- **`amix` menormalkan sendiri, dan itu mengubah aturan `volume`**: di ffmpeg < 7.0 `amix` selalu membagi per jumlah input, jadi `volume=2` wajib untuk mengembalikan level. Di 7.0+ ada `normalize=0` dan `volume=2` jadi salah — hasilnya dobel amplitudo lalu kena limiter. Cek dulu: `ffmpeg -version | head -1`, baru pilih. Kalau ragu, pakai `normalize=0` dan ukur hasilnya dengan `volumedetect`, jangan percaya rumus.
-- **`loudnorm` inline + `apad` = ekor audio mati**: jangan campur keduanya dalam satu `filter_complex`. Normalisasi VO ke file terpisah lebih dulu (lihat §7 gerbang ekor audio).
+- **`amix` + `volume` — jangan pakai keduanya sekaligus.** Diukur di ffmpeg 7.1 dengan VO hasil `loudnorm` (−17,0 dB mean, −1,5 max): `amix` default `normalize=1` → −24,5 dB; `amix` default + `volume=2` → −18,5 dB; `amix normalize=0` → −18,5 dB (**identik**); `normalize=0` + `volume=2` → −12,5 dB, max **0,0 dB (clipping)**.
+
+  Kesimpulannya: `volume=2` dengan `normalize` default setara dengan `normalize=0`, jadi contoh di §6 aman di 6.x maupun 7.x. Bahayanya justru menggabungkan keduanya. Pilih satu, lalu ukur dengan `volumedetect` — jangan percaya rumus, karena perilaku default `amix` berubah antar versi. Kalau `max_volume` menyentuh 0,0 dB padahal `alimiter` sudah dipasang, periksa apakah `volume` dan `normalize=0` terpasang bersamaan, lalu cek opsi `level` alimiter (lihat butir di atas).
+- **`loudnorm` inline + `apad` = ekor audio mati**: jangan campur keduanya dalam satu `filter_complex`. Normalisasi VO ke file terpisah lebih dulu (resep tiga langkah di §6, gerbang di §7). Terukur: satu rantai → `silence_start 40,86` di video 43 dtk, ekor −91 dB; tiga langkah → ekor −25 s/d −33 dB, `silencedetect` kosong.
+- **`afade=t=in` di awal musik kena gerbang ekor audio**: musik yang mulai dari senyap terbaca sebagai keheningan tak sengaja (terukur: `silence_start 0`, durasi 0,53 dtk). Biarkan musik masuk di level penuh, fade hanya di akhir.
 - **`textbbox` dengan `anchor` tidak sama dengan bentuk glyph**: melihat bb[1]/bb[3] sebagai simetris terhadap titik anchor akan salah untuk angka dan teks kapital. Selalu hitung selisih pusat bbox terhadap titik anchor sebelum menempatkan di dalam bentuk (lihat GUIDE.md §2).
 - **Elemen idle kecil kena quantize encoder**: dot/particle radius <15 px yang cuma berdenyut di area flat besar bisa hilang setelah encode (CRF 18+), sehingga frame decoded jadi identik → freeze nyata di MP4 padahal renderer menggambar gerakan. Perbesar elemen (radius ≥14 px, amplitudo geser ≥10 px), dan gerak posisinya, bukan cuma radius-only (perubahan radius lingkaran solid tanpa antialias sering tidak mengubah piksel mana pun).
 
