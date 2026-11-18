@@ -122,6 +122,18 @@ These are options, not a checklist. Pick what fits the content and keep the syst
 
 Rhythm comes from content, not numbers. The "core scenes run a few seconds" note merely describes short video in general — if an idea needs 8 seconds to land, give it 8. What still holds: put the biggest variation in the opening, and never make late-third scenes so short the viewer cannot absorb them.
 
+**The two formats have different rhythms, and both are legitimate.**
+
+| | Portrait, ≤60 s | Landscape, ≤300 s |
+|---|---|---|
+| Shape | one sharp point, stated and closed | hook → a few sections → close, with breathing room between sections |
+| Attention | every second earns the next | a re-hook roughly every 40–60 s: a visual jump, a question, a change of scale |
+| Rest | almost none | short beats of calm between sections |
+
+Those are descriptions of how the two formats behave, not scene counts or durations you must hit. Scene count follows the narrative in both; what changes is that a five-minute piece has room for sections and a 60-second piece does not.
+
+A five-minute video that keeps the 60-second rhythm exhausts the viewer by minute two — the same way a 60-second video padded with calm beats feels empty. Change the rhythm with the cap, not the other way around.
+
 Avoid excessive glitch, random spins, unmotivated flashes, and transitions that mask the explanation. Every transition must fit inside the computed total duration. The video never grows because of a transition.
 
 ## 5. Turning ideas into visuals
@@ -151,11 +163,11 @@ This is not a required list. If an idea has a better shape outside the table, us
 
 ## 6. Variation that keeps a system
 
-A short video with a dozen scenes slides easily into "same layout, different words". How to avoid it without losing coherence:
+A video with a dozen or more scenes slides easily into "same layout, different words" — and the risk grows with the 5-minute landscape cap. How to avoid it without losing coherence:
 
 - **Vary composition**, not just content: text left + image right, plain centred text, text hugging an edge, text layered behind an object, very small text in a wide space.
 - **Vary density**: dense scenes (many elements) alternating with airy ones (one element, lots of space). Uniform density exhausts the viewer.
-- **Vary background**: light/dark may alternate, but hold one accent colour across the whole video so it reads as one family.
+- **Vary background**: light/dark may alternate, but hold one accent colour across the whole video so it reads as one family. On a long piece this is what keeps sections distinct without breaking the system; change the background per section, not per scene, or it becomes noise.
 - **Vary scale**: one scene with an oversized element bleeding off-frame makes the rest feel airy even at normal size.
 - **Hold one thing constant**: one accent colour, one display face, one dominant motion type. That constant is what makes the variation feel intentional rather than random.
 
@@ -176,7 +188,7 @@ Two identical neighbours can be a deliberate pair (a before/after, a repeat moti
 
 ## 7. Sync with the voiceover
 
-The voiceover is the primary timing source; total duration is set in stage 4 of `SKILL.md` (voice + lead-in + tail, capped by `MAX_DUR`, default 60 s).
+The voiceover is the primary timing source; total duration is set in stage 4 of `SKILL.md` (voice + lead-in + tail, capped by `MAX_DUR` — **60 s portrait, 300 s landscape**).
 
 Word timing comes from the audio itself through speech recognition with per-word timestamps, not from word count (`RENDER.md` §3). Every text appearance reads from one absolute-time table (`RENDER.md` §5), and the result is proven by the sync gate (`RENDER.md` §7): text may never appear before its word.
 

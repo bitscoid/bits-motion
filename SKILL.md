@@ -1,6 +1,6 @@
 ---
 name: bits-motion
-description: Creates finished motion-graphics explainer videos (MP4, H.264 + AAC, 30 fps) from a single topic. Duration follows the voiceover; 60 seconds by default, longer only when the user asks for it. The agent writes the voiceover script first, then offers and gathers assets (recorded voiceover, supporting images, style reference video, background music), synchronises everything, renders the MP4, and verifies the duration from the exported file. Trigger this skill whenever the user wants a motion graphic, an animated explainer, kinetic typography, or a short explainer video about any topic — including phrases like "make a motion graphic about ...", "short explainer video" — or hands over audio, images, or a reference video to be turned into a video, even if the skill is never named. All communication with the user is in Indonesian; every document in this skill is in English.
+description: Creates finished motion-graphics explainer videos (MP4, H.264 + AAC, 30 fps) from a single topic. Duration follows the voiceover, capped by orientation — 60 seconds for portrait (Reels/TikTok/Shorts), 5 minutes for landscape (YouTube) — and longer only when the user asks. The agent decides orientation with the script, writes the voiceover script first, then offers and gathers assets (recorded voiceover, supporting images, style reference video, background music), synchronises everything, renders the MP4, and verifies the duration from the exported file. Trigger this skill whenever the user wants a motion graphic, an animated explainer, kinetic typography, or a short explainer video about any topic — including phrases like "make a motion graphic about ...", "short explainer video" — or hands over audio, images, or a reference video to be turned into a video, even if the skill is never named. All communication with the user is in Indonesian; every document in this skill is in English.
 ---
 
 # BITS Motion Graphics
@@ -18,14 +18,21 @@ Execute every stage in the main session: script, assets, sync, render, QC. Do no
 | Parameter | Value |
 |---|---|
 | Final duration | Voiceover duration + ~1 s lead-in + ~1.5 s tail, rounded **up** to whole seconds. No minimum |
-| Duration cap (`MAX_DUR`) | Default **60 s**, locked. Raise only when the user explicitly asks |
+| Duration cap (`MAX_DUR`) | **Portrait 60 s**, **landscape 300 s (5 min)**, locked. Raise only when the user explicitly asks |
 | Frame rate | 30 fps, constant |
 | Frame count | duration × 30, exact. Example: 43 s = 1290 frames |
 | Format | MP4, H.264 video (high profile), AAC audio, stereo |
 | Loudness | finished mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP |
-| Resolution | Follow the reference video's orientation. Without a reference, ask; if unanswered use 1920×1080. Portrait = 1080×1920 |
+| Resolution | Follow the reference video's orientation. Without a reference, ask in stage 1; if unanswered use 1920×1080 (cap 300 s). Portrait = 1080×1920 (cap 60 s) |
 
-Audio decides length. `MAX_DUR` stays locked unless the user asks for more — if the voiceover overruns it, stop and ask; never silently lengthen the video.
+Audio decides length. The cap depends on orientation, because the two targets are different products: a portrait Reels/TikTok clip is a 60-second short, a landscape YouTube explainer can hold five minutes. `MAX_DUR` stays locked unless the user asks for more — if the voiceover overruns the cap for that orientation, stop and ask; never silently lengthen the video.
+
+| Orientation | `MAX_DUR` | Why |
+|---|---|---|
+| Portrait `1080×1920` | **60 s** | Reels / TikTok / Shorts sweet spot |
+| Landscape `1920×1080` | **300 s** (5 min) | YouTube explainer length |
+
+The orientation picks the row — and orientation is settled when the script is written (stage 1), not when a reference appears (stage 2), because the cap sets the script length. An explicit user target replaces the row's number for that run, and it may be longer than 300 s only if the user named it.
 
 Once stage 4 computes the total duration, that number is the exact render target. The file must be exactly that long: voiceover and visuals are already synced to that timeline, so a small drift truncates the ending or leaves it hanging.
 
@@ -149,8 +156,10 @@ Follow this order. Do not jump to render before stages 1–3 are done.
 The user gives a topic. Your first job is the narration script — unless the user brings their own script or recording, in which case use theirs and skip to stage 2.
 
 Script guidance:
-- Length follows the topic, computed from the active cap: **~2.5 words per second** including ~2.5 s of lead-in and tail. So ~140 words is the rough figure for 60 s — a derived number, not a rule; a 90 s cap means ~215 words. Short topics stay short; never pad sentences to fill time. Show the estimated voice and video duration.
+- **Know the orientation before writing.** The cap follows it (portrait 60 s, landscape 300 s), and the cap sets the script length — so orientation is decided first, not in stage 2. If the user gave a reference video, its orientation answers it. Otherwise ask it as part of the first message, together with the script. Never write 740 words for a portrait Reels clip.
+- Length follows the topic, computed from the active cap: **~2.5 words per second** including ~2.5 s of lead-in and tail. Portrait 60 s → **~140 words**; landscape 300 s → **~740 words**. These are derived figures, not rules, and they are ceilings: a topic that lands in 90 s on a 5-minute target stays 90 s. Never pad sentences to fill time. Show the estimated voice and video duration.
 - Structure: open with whatever grips hardest (a sentence, a question, a number), then 2–3 core points, then a closing line that lands. The hook is about effect, not seconds — the first 3 s is a rough guide, not a requirement. Keep sentences short so they split cleanly into on-screen text and read well through TTS.
+- On a five-minute landscape target, 2–3 core points is not enough air; give each core point its own beat and keep one idea per scene. On a 60-second portrait target, cut to the single sharpest point and let it breathe.
 - Clear, natural spoken language. Spell numbers, abbreviations, and foreign terms so TTS cannot mispronounce them.
 - Never invent facts. If the topic needs data, search the web when available, otherwise use safe general claims.
 - Length is decided here. Stage 4 may not cut or speed up the voiceover, so fix any overrun now.
@@ -159,13 +168,17 @@ Display format:
 
 ```
 ## Naskah Voiceover — [Topik]
+Format: [tegak, maksimal 60 detik / mendatar, maksimal 5 menit]
 Perkiraan: ± [N] kata ≈ [N] detik suara ≈ [N] detik video
+Batas: [60 / 300 / angka yang Anda setujui] detik
 
 **[Hook]** ...
 **[Inti 1]** ...
 **[Inti 2]** ...
 **[Penutup]** ...
 ```
+
+The label line before the script is not optional: it tells the user, before any work, which cap the script is being written against. If the orientation is still unknown when the script is ready, say so on that line (`Format: belum ditentukan — saya pakai mendatar (maksimal 5 menit)`) and let them correct it.
 
 The `[Hook]` / `[Inti N]` / `[Penutup]` labels exist only for display and scene-timing maps. When generating TTS (yourself, or by handing the script to the user), send the text **without** labels — labels get read aloud. See `references/RENDER.md` §3.
 
@@ -198,9 +211,10 @@ kecuali suara — suara yang menentukan panjang dan penyesuaian waktu video.
    cari gambar yang sesuai di internet, menggambarnya lewat kode, atau
    menggabungkan keduanya — mana yang paling jelas untuk tiap bagian.
 
-5. Orientasi layar
-   Tegak (1080×1920, cocok untuk Reels/TikTok/Shorts) atau
-   mendatar (1920×1080)? Kalau tidak disebut, saya pakai mendatar.
+5. Orientasi layar (menentukan panjang maksimal)
+   Tegak (1080×1920, untuk Reels/TikTok/Shorts, maksimal 60 detik)
+   atau mendatar (1920×1080, untuk YouTube, maksimal 5 menit)?
+   Kalau tidak disebut, saya pakai mendatar.
 
 6. Caption dan subtitle (opsional)
    Caption di dalam video, berkas .srt untuk diunggah ke platform,
@@ -218,7 +232,7 @@ tipografinya.
 | Background music | `audio/music.wav` | Optional | You generate simple music, or render silent |
 | Style reference video | `assets/reference.mp4` | Optional | Search Pinterest for `motion graphics` + topic keywords (stage 3); if nothing fits, design the style yourself |
 | Supporting images (1st, 2nd, …) | `assets/image-01.png`, `assets/image-02.png`, … | Optional | You find suitable images online, draw them in code, or both |
-| Screen orientation | — | Ask | Default landscape 1920×1080; portrait 1080×1920 |
+| Screen orientation | — | Ask (it sets `MAX_DUR`) | Default landscape 1920×1080 → cap 300 s; portrait 1080×1920 → cap 60 s |
 | Captions / subtitles | burned-in or `output/<slug>.srt` | Optional, asked once | No captions; offer the `.srt` in the delivery message |
 
 The table above is for your own reference. What reaches the user is the Indonesian block. Typography is **not** asked about — that is your call in stage 4, and if the right font is not installed you download it.
@@ -319,18 +333,19 @@ Final duration comes from the real audio:
 > total duration = voiceover + ~1 s lead-in (speech starts around second 1) + ~1.5 s tail, rounded up to whole seconds
 > frame count = total duration × 30
 
-Examples: voiceover 37.3 s → 39.8 → 40 s (1200 frames). Voiceover 52.6 s → 55.1 → 56 s (1680 frames).
+Examples: voiceover 37.3 s → 39.8 → 40 s (1200 frames). Voiceover 52.6 s → 55.1 → 56 s (1680 frames). Portrait 58.1 s → 60.6 → **over the 60 s cap**; landscape 212 s → 214.5 → 215 s (6450 frames).
 
 - **Within the cap:** proceed. The computed number is the exact video duration. Fill lead-in and tail with meaningful visuals (title, accent, summary) — never blank, frozen, or black frames. Never stretch the audio. Report it in one line:
 
   ```
   Suara [X] detik. Video jadi [Y] detik ([Y×30] bingkai), 30 fps.
   ```
-- **Over the cap** (`MAX_DUR`, default 60 s — meaning a voiceover longer than roughly `MAX_DUR - 2.5` s): stop before rendering. Never cut words, speed up speech, or compress pauses.
+- **Over the cap** — `MAX_DUR` is **60 s for portrait** and **300 s for landscape**, meaning a voiceover longer than roughly `MAX_DUR - 2.5` s: stop before rendering. Never cut words, speed up speech, or compress pauses.
 
   ```
   Suaranya [X] detik, jadi videonya sekitar [Y] detik. Batas yang saya pakai
-  [MAX] detik, dan saya tidak memotong kata atau mempercepat suara.
+  [MAX] detik untuk video [tegak/mendatar], dan saya tidak memotong kata atau
+  mempercepat suara.
 
   Pilihannya:
   1. Naskah dipersingkat, lalu suara dibuat ulang
@@ -370,7 +385,7 @@ Inspect the exported MP4 from start to finish, not just the timeline editor:
 4. Transitions are smooth, varied, and purposeful.
 5. Music supports and speech stays dominant.
 6. No black frames, frozen frames, glitches, or unintended audio defects.
-7. The MP4 plays. Actual duration equals the stage-4 total (never over the active cap), frame count = duration × 30, 30 fps, codec and resolution per spec, nothing after the final second, and the cap in use is stated (default 60 s or the number the user approved). All of it proven from the exported file's metadata.
+7. The MP4 plays. Actual duration equals the stage-4 total (never over the active cap), frame count = duration × 30, 30 fps, codec and resolution per spec, nothing after the final second, and the cap in use is stated (60 s portrait, 300 s landscape, or the number the user approved). All of it proven from the exported file's metadata.
 8. Gates in `references/RENDER.md` §7 pass: sync (no text appears before its word), geometry (safe area, size legibility, collision, contrast), audio (no dead air inside the speech region; music present in the tail when music exists; mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP), and repetition pattern (flag only, your call). Prove it with numbers and state them in the delivery message.
 
 Check the creative side with your eyes, not a script: open a contact sheet of the export:
@@ -380,7 +395,17 @@ mkdir -p work/check
 ffmpeg -i output/<slug>.mp4 -vf "fps=1,scale=300:-1,tile=8x8" -frames:v 1 work/check/sheet.png
 ```
 
-`-frames:v 1` is required — a tile grid is one image, and without it the command fails on the second frame. Eight columns reaches 60 s; for longer renders drop to `fps=1/2`. If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
+`-frames:v 1` is required — a tile grid is one image, and without it the command fails on the second frame.
+
+The grid has to cover the whole video, and the default `fps=1` only fits 64 cells (~64 s). Size it from `DUR`, three seconds per cell for landscape so a 5-minute video still reads as one sheet:
+
+```bash
+CELLS=$(( (DUR + 2) / 3 ))                     # one thumbnail per 3 s
+SCALE=$(python3 -c "import math;print(max(1,int(math.ceil(math.sqrt($CELLS)))))")
+ffmpeg -i output/<slug>.mp4 -vf "fps=1/3,scale=240:-1,tile=${SCALE}x${SCALE}" -frames:v 1 work/check/sheet.png
+```
+
+For a 60 s portrait video the same `fps=1/3` gives 20 cells in a 5×5 grid; for 300 s, 100 cells in 10×10. If every thumbnail looks like the same pattern with different words, composition variation is insufficient (`GUIDE.md` §6) — fix it before delivery.
 
 Fix everything you find before handing over. Deliver the MP4 using whatever mechanism the environment offers, or simply state its path. Project files are optional extras; the MP4 is mandatory.
 
@@ -394,7 +419,7 @@ Durasi   : [Y] detik
 Bingkai  : [Y×30] bingkai, 30 fps
 Ukuran   : [W]×[H] ([tegak/mendatar])
 Format   : MP4, H.264 (high), audio AAC stereo
-Batas    : [60 detik / angka yang Anda setujui]
+Batas    : [60 detik (tegak) / 300 detik (mendatar) / angka yang Anda setujui]
 
 Pemeriksaan
 - Tidak ada bingkai hitam maupun bingkai beku

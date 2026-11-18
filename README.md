@@ -9,7 +9,7 @@ No storyboard. No editing advice. A rendered MP4 you can publish.
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Format](https://img.shields.io/badge/output-MP4%20H.264%20%2B%20AAC-blue)
 ![Frame rate](https://img.shields.io/badge/fps-30%20CFR-informational)
-![Duration](https://img.shields.io/badge/duration-follows%20voiceover-brightgreen)
+![Duration](https://img.shields.io/badge/duration-60s%20portrait%20%7C%20300s%20landscape-brightgreen)
 ![Docs](https://img.shields.io/badge/docs-English%20only-lightgrey)
 
 </div>
@@ -24,9 +24,14 @@ Give it a topic. It writes the voiceover script, gathers your assets, syncs ever
 topic ──► script ──► voice ──► word timing ──► scenes ──► MP4 ──► verified
 ```
 
-The output is an **MP4 (H.264 + AAC, 30 fps, constant frame rate)** whose length is derived from the voiceover — 60 seconds by default, longer only when you ask.
+The output is an **MP4 (H.264 + AAC, 30 fps, constant frame rate)** whose length is derived from the voiceover, capped by orientation:
 
-Resolution follows the reference video's orientation. Without a reference it asks, and falls back to **1920×1080** landscape or **1080×1920** portrait.
+| Orientation | Cap | Target |
+|---|---|---|
+| Portrait `1080×1920` | **60 s** | Reels / TikTok / Shorts |
+| Landscape `1920×1080` | **300 s** (5 min) | YouTube explainer |
+
+Longer only when you ask. Resolution follows the reference video's orientation; without a reference it asks, and falls back to **1920×1080** landscape or **1080×1920** portrait.
 
 ---
 
@@ -181,6 +186,8 @@ tiga-mitos-otak/
 
 Verified on ffmpeg 7.1. Every ffmpeg behaviour cited in the docs was measured on a real render, not copied from documentation.
 
+Disk and time scale with the cap: a 300 s landscape video is **9000 PNG frames** before encoding. Render with the resume worker and expect the encode to take minutes, not seconds.
+
 ---
 
 ## 🧩 How the documents fit together
@@ -213,7 +220,8 @@ Then verifies it before use — under 10 KB means an HTML error page, not a font
 - Music is **synthesised** unless you supply your own — simple chords, not a composition
 - Word timing is **approximate** when ASR is unavailable, and the delivery message says so
 - The agent cannot watch the video; visual QC relies on extracted frames, contact sheets, and measured numbers
-- Maximum 60 seconds by default — this is a short-form explainer, not a documentary tool
+- Capped at **60 s portrait / 300 s landscape** — a five-minute explainer, not a documentary tool
+- A 5-minute landscape render is 9000 frames; expect it to take longer than a short clip, and the script needs ~740 words at ~2.5 words/s
 - Captions are **offered, not assumed**; burned-in captions are a separate style decision from kinetic typography
 - Loudness of the finished mix is verified, but creative judgements (does the beat land, does the hook grip) stay yours
 

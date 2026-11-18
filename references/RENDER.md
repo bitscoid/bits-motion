@@ -199,7 +199,9 @@ If the voiceover is delayed during mixing (e.g. starting at second 1), every ASR
 
 Format note: the examples use `audio/voiceover.wav`. Files the user supplies may be .mp3/.wav/.m4a — normalise to `audio/voiceover.wav` (48 kHz mono) before analysis.
 
-If the computed total (voiceover + ~2.5 s) exceeds `MAX_DUR` (default 60 s), stop and ask (see stage 4 in `SKILL.md`).
+If the computed total (voiceover + ~2.5 s) exceeds the cap for that orientation — **60 s portrait, 300 s landscape** — stop and ask (see stage 4 in `SKILL.md`).
+
+The two caps are different products, not a preference: a portrait clip runs in a feed next to other 30–60 s clips, a landscape explainer runs on a platform that expects minutes. A 5-minute portrait video is not "more thorough", it is unwatchable in that context; a 60-second landscape video under-delivers its format. Pick the cap by orientation and hold it.
 
 ### When there is no voiceover
 
@@ -369,6 +371,15 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
 - Draw icons and diagrams from code shapes (donut, bar, briefcase, bulb) — never text or emoji. Backgrounds may alternate between scenes (light/dark) with one consistent accent colour.
 - Simulate motion blur by averaging several sub-frames at slightly different times.
 - Render in parallel with resume: because frames are deterministic, draw with several workers (`multiprocessing`, 4–8 processes) and skip frames whose PNG already exists and is non-empty. If a render dies, rerun the same script — only missing frames are redrawn.
+
+  **Budget the disk before a long render.** A 300 s landscape video is 9000 PNGs. Measured: 9000 frames at 160×90 came to 21 MB, and 1080×1920 scales that by ~144× — **≈3 GB on disk**, before the MP4. Check free space first and delete `work/frames/` right after the encode:
+
+  ```bash
+  df -h . | tail -1
+  ls work/frames | wc -l          # expect exactly FRAMES
+  ```
+
+  If space is tight, pipe raw frames straight into ffmpeg instead of writing PNGs (`-f rawvideo -pix_fmt rgb24 -s WxH -r 30 -i -`); you lose resume, so only do it once the render is stable.
 - Load the stage-5 timeline as data (a list of segments with start/end times) so it is easy to retune.
 - **One absolute-time table as the single source.** Every element appearance time (`{label: video_seconds}`) lives in one table, and scenes read from it — scenes never keep their own entry offsets. Scene boundaries derive from ASR sentence boundaries, not typed separately. When each scene carries its own numbers, shifting one sentence means shifting six numbers and the drift returns in the next scene. Never hard-code label times to seconds while beats can still change: use `B_VIDEO[key] - scene_start` computed at render time, not a frozen `0.55`.
 - Render frame 0 through (frame count − 1). The final frame must still hold a clear closing visual, never an empty screen.
@@ -377,18 +388,27 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
 
 Duration follows the voiceover. Compute total duration and frame count first (rules in stage 4 of `SKILL.md`):
 
-Set the cap first. `MAX_DUR` defaults to 60; raise it only when the user explicitly asks.
+Set the cap first, from the orientation. Portrait `1080×1920` → **60 s**; landscape `1920×1080` → **300 s (5 min)**. Raise it only when the user explicitly names a target.
 
 ```bash
-MAX_DUR=60                      # default cap; change only on user request
+ORIENT=landscape                # portrait | landscape -- read it from stage 2, never guess
+case "$ORIENT" in
+  portrait)  MAX_DUR=60 ;;
+  landscape) MAX_DUR=300 ;;
+esac
 VO_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "audio/voiceover.wav")
 DUR=$(awk -v v="$VO_DUR" 'BEGIN{t=v+2.5; d=int(t); if (d<t) d++; print d}')
 FRAMES=$((DUR*30))
 FADE_ST=$(awk -v d="$DUR" 'BEGIN{print d-2.5}')
 mkdir -p work
-echo "voiceover=$VO_DUR  total=$DUR s  frames=$FRAMES  cap=$MAX_DUR"
-awk -v d="$DUR" -v m="$MAX_DUR" 'BEGIN{if(d>m) print "OVER CAP "m" S: stop and ask the user"}'
+echo "orient=$ORIENT  voiceover=$VO_DUR  total=$DUR s  frames=$FRAMES  cap=$MAX_DUR"
+awk -v d="$DUR" -v m="$MAX_DUR" -v o="$ORIENT" \
+  'BEGIN{if(d>m) print "OVER CAP "m" S for "o": stop and ask the user"}'
 ```
+
+An explicit user target replaces `MAX_DUR` for that run instead of the `case` result — set `MAX_DUR` to the target and recompute.
+
+A 5-minute landscape video is 9000 frames, not 1800. Plan for it: render with the resume worker (§5), and give the contact sheet three seconds per cell (§7) so it still fits one image.
 
 Use those `DUR` and `FRAMES` values for the whole render (frames drawn, timeline, export). The voiceover is delayed to start at second 1 (`adelay`), padded to the end, and the music is looped, trimmed to the video length, lowered in volume, and ducked under speech.
 
@@ -453,7 +473,7 @@ ffprobe -v error -show_entries format=duration:stream=codec_type,codec_name,widt
 ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 output/<slug>.mp4
 ```
 
-Target: container ≈ `DUR` seconds (to three decimals), `FRAMES` video frames, 30 fps, H.264 + AAC, resolution as planned. The AAC encoder adds slight padding so the audio stream duration can differ by milliseconds; the container duration and video frame count are the evidence. Report the real numbers. If they miss, fix and re-export — never round the report.
+Target: container ≈ `DUR` seconds (to three decimals), `FRAMES` video frames, 30 fps, H.264 + AAC, resolution as planned, and `DUR` inside the cap for the orientation (60 s portrait / 300 s landscape). The AAC encoder adds slight padding so the audio stream duration can differ by milliseconds; the container duration and video frame count are the evidence. Report the real numbers. If they miss, fix and re-export — never round the report.
 
 Detect unintended problems:
 
@@ -474,7 +494,16 @@ ffmpeg -i output/<slug>.mp4 -af silencedetect=noise=-50dB:d=0.5 -vn -f null - 2>
 ffmpeg -i output/<slug>.mp4 -af volumedetect -vn -f null - 2>&1 | grep -E "mean_volume|max_volume"
 ```
 
-**Motion gate:** `freezedetect=n=0:d=1.0` must come back empty, except for a deliberate, timeline-documented rest (at most one, ≤1.5 s, near the close). A freeze means the render is genuinely still — go back to §5, add micro camera motion or element animation, re-render. Report this gate result alongside the duration.
+**Motion gate:** `freezedetect=n=0:d=1.0` must come back empty, except for deliberate, timeline-documented rests. A freeze means the render is genuinely still — go back to §5, add micro camera motion or element animation, re-render. Report this gate result alongside the duration.
+
+How many rests are allowed scales with length, because a five-minute explainer needs breathing room a 60-second clip does not. The gate is measurable either way — it just counts longer videos differently:
+
+| Runtime | Allowed rests | Each |
+|---|---|---|
+| ≤60 s | 1 | ≤1.5 s |
+| >60 s | ≤1 per full minute of runtime | ≤2.5 s |
+
+Where they go is your call. A rest is a beat of calm after a point lands, never a stalled scene in the middle of an explanation, and every rest is written in the timeline with its reason — the gate stays a gate, it just knows the video is longer now.
 
 The lead-in is not covered by this gate: the first `VO_DELAY` (1 s) holds the title/accent and is allowed to sit still, because nothing is being narrated yet. A freeze reported **entirely** inside `0..1 s` is not a defect; a freeze that reaches into speech is.
 
@@ -666,11 +695,18 @@ ffmpeg -i output/<slug>.mp4 -vf "fps=1/2,scale=640:-1" work/check/%02d.png
 ffmpeg -ss $(awk -v d="$DUR" 'BEGIN{print d-0.1}') -i output/<slug>.mp4 -frames:v 1 work/check/last.png
 ```
 
-The contact sheet needs `-frames:v 1`: a `tile` grid is one image, and without it ffmpeg tries to write that image once per input frame and dies at the second one (`Cannot write more than one file with the same name`, exit −22). A 60 s video at `fps=1` yields 60 thumbnails, which exceeds `6x8` (48 cells) — use `8x8` for anything over 48 s, or a lower `fps`:
+The contact sheet needs `-frames:v 1`: a `tile` grid is one image, and without it ffmpeg tries to write that image once per input frame and dies at the second one (`Cannot write more than one file with the same name`, exit −22).
+
+The grid must also cover the whole video, and the cap is now 300 s for landscape — 5× the old 60 s. `fps=1` at `8x8` stops at 64 s, so a 5-minute video silently loses its last four minutes. Size both the interval and the grid from `DUR`:
 
 ```bash
-ffmpeg -i output/<slug>.mp4 -vf "fps=1,scale=300:-1,tile=8x8" -frames:v 1 work/check/sheet.png
+CELLS=$(( (DUR + 2) / 3 ))                       # one thumbnail per 3 s
+GRID=$(python3 -c "import math; print(max(1, math.ceil(math.sqrt($CELLS))))")
+ffmpeg -i output/<slug>.mp4 -vf "fps=1/3,scale=240:-1,tile=${GRID}x${GRID}" \
+  -frames:v 1 work/check/sheet.png
 ```
+
+Measured: 60 s → 20 cells in 5×5; 300 s → 100 cells in 10×10. Never hand-tile a fixed grid for a duration that can now reach five minutes.
 
 ## 8. Self-made background music
 
@@ -706,7 +742,7 @@ Use at most a few per video, always below the voiceover level, and tell the user
 - **`silencedetect` `$3` is not the timestamp.** The logger writes `[silencedetect @ 0x…] silence_start: 12.34`, so the time is the **last** field (`$NF`). Filtering on `$3` silently matches nothing and every gate appears to pass.
 - **`textbbox` with `anchor` is not the glyph shape:** treating bb[1]/bb[3] as symmetric around the anchor point is wrong for numerals and capital text. Always compute the bbox centre offset from the anchor before placing inside a shape (see `GUIDE.md` §2). And always pass the **same anchor** you draw with — at the default anchor the returned box is relative to the draw origin, not the canvas, so `assert bb[0] > W*0.04` compares an x-offset to a canvas margin.
 - **`blackdetect` default `pix_th=0.1` flags legitimate dark design:** a `0x0B0B0F` background (luma 0.043) is reported as black from `pix_th=0.05` upward; at `0.02` it is clean while true `0x000000` is still caught. Use `pix_th=0.02`.
-- **`tile` without `-frames:v 1`** writes the grid once per input frame and fails on the second (`Cannot write more than one file with the same name`, exit −22). Also make sure the tile grid has room: 60 s at `fps=1` is 60 frames, more than `6x8`.
+- **`tile` without `-frames:v 1`** writes the grid once per input frame and fails on the second (`Cannot write more than one file with the same name`, exit −22). Also make sure the tile grid has room: a fixed `8x8` at `fps=1` covers only 64 s, so a 300 s landscape video shows its first minute and silently drops the other four. Size interval and grid from `DUR` (§7).
 - **Missing frames mid-sequence truncate the encode:** `-i work/frames/%05d.png` stops at the first gap, and `-pattern_type glob` reorders but does not fill. Measured: a 5-file sequence with `00002.png` missing encoded 2 frames. Assert contiguity before encoding (§6).
 - **SRT timestamps from float seconds misformat:** `int(round((s % 1) * 1000))` yields `",1000"` for 1.9996 s, which players reject. Convert to integer milliseconds first, then `divmod` (recipe in §3).
 - **Small idle elements quantised by the encoder:** dots/particles under ~15 px radius that merely pulse in a large flat area can vanish after encoding (CRF 18+), leaving identical decoded frames → a real freeze in the MP4 even though the renderer drew motion. Enlarge the element and move its position, not just its radius (a solid antialias-free circle changing radius often alters no pixel at all).
