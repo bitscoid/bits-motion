@@ -1,5 +1,5 @@
 ---
-name: bits-motion-graphics
+name: bits-motion
 description: Creates finished motion-graphics explainer videos (MP4, H.264 + AAC, 30 fps) from a single topic. Duration follows the voiceover; 60 seconds by default, longer only when the user asks for it. The agent writes the voiceover script first, then offers and gathers assets (recorded voiceover, supporting images, style reference video, background music), synchronises everything, renders the MP4, and verifies the duration from the exported file. Trigger this skill whenever the user wants a motion graphic, an animated explainer, kinetic typography, or a short explainer video about any topic — including phrases like "make a motion graphic about ...", "short explainer video" — or hands over audio, images, or a reference video to be turned into a video, even if the skill is never named. All communication with the user is in Indonesian; every document in this skill is in English.
 ---
 
