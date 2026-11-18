@@ -22,7 +22,7 @@ Run this first and plan around the result:
 ffmpeg -version | head -1; ffprobe -version | head -1
 ffmpeg -hide_banner -encoders 2>/dev/null | grep -E "(libx264|aac)" || echo "WARNING: libx264/aac encoder missing"
 python3 -c "import PIL, numpy; print('PIL+numpy ok')"
-python3 -c "import skia; print('skia', skia.__version__)" 2>/dev/null || echo "skia: absent (shapes will be hard-edged; supersample at 2x)"
+python3 -c "import skia; print('skia', skia.__version__)"
 python3 -c "import faster_whisper; print('word-level ASR: available')" 2>/dev/null || echo "ASR: unavailable (pip install faster-whisper; without it word timing becomes an estimate -- tell the user)"
 fc-list | head -20          # available fonts
 [ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API_KEY: present" || echo "GEMINI_API_KEY: absent"
@@ -140,8 +140,7 @@ Choose the font that **suits the topic**, not the one that is easiest to downloa
 Python draws every frame deterministically from `t = frame_index / 30`, then ffmpeg assembles it. That is what makes the frame count exactly duration × 30 and lets animation sync to the timeline.
 
 ```bash
-pip install pillow numpy            # required
-pip install skia-python             # strongly recommended, see below
+pip install pillow numpy skia-python
 ```
 
 ### Two rasterisers, one file
@@ -153,23 +152,12 @@ pip install skia-python             # strongly recommended, see below
 
 The split: **skia for shapes, PIL for text.** Draw the frame in skia, take `makeImageSnapshot()` to a numpy array, `Image.fromarray(...)`, then draw text with PIL on top. Measured cost of that hybrid: **38 ms/frame**.
 
-The split is forced by two measured limits:
+Both are required, and the split is forced by two measured limits:
 
-- **skia cannot shape text.** `drawString` measured **439 px** for `مرحبا بالعالم` where PIL + RAQM measures **307 px** — isolated letters instead of joined script. Text stays in PIL, with `layout_engine=ImageFont.Layout.RAQM` for Arabic, Indic and Thai.
+- **skia cannot shape text.** `drawString` measured **439 px** for `مرحبا بالعالم` where PIL + RAQM measures **307 px** — isolated letters instead of joined script. Text goes through PIL, with `layout_engine=ImageFont.Layout.RAQM` for Arabic, Indic and Thai.
 - **PIL cannot antialias shapes, and it rounds to whole pixels.** A circle drawn with `ellipse` has one hard step at the edge — measured 2 distinct values across the transition, against fractional coverage in skia. It also snaps coordinates: moving a circle from x=100.0 to x=100.4 changed **0 pixels** (skia: 496). Invisible on a rectangle, obvious on a diagonal, a circle, or a line thinner than 3 px — and fatal to sub-pixel drift.
 
-### If skia is unavailable
-
-Supersample at **2×**: measured **186 ms/frame and ~40 MB**. Text does not need it; FreeType already antialiases glyphs. When time is short, supersample the shapes only, or accept hard edges on small elements and keep the text sharp.
-
-Check what you actually have before claiming it — a rasteriser that is assumed installed fails deep into a render:
-
-```bash
-python3 -c "import skia; print('skia', skia.__version__)" 2>/dev/null \
-  || echo "skia: absent (shapes will be hard-edged; supersample at 2x)"
-```
-
-If installation fails (blocked network, no permission), report the reason and continue on PIL alone. Never silently degrade quality, and never claim a rasteriser you have not verified. If nothing runs at all, follow "Honesty about the result" in `SKILL.md`.
+If `pip install skia-python` fails (blocked network, no permission), stop and report it. Never render shapes without it, and never claim a rasteriser you have not verified. If nothing runs at all, follow "Honesty about the result" in `SKILL.md`.
 
 Store frames as `work/frames/00000.png` through `work/frames/01199.png`. To save memory you can pipe straight into ffmpeg (`-f rawvideo -pix_fmt rgb24 -s WxH -r 30 -i -`).
 
@@ -524,7 +512,7 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
   - idle elements move in **position**, not just radius/scale (see the encoder note above).
 - Draw icons and diagrams from code shapes (donut, bar, briefcase, bulb) — never emoji or symbol codepoints, which render as tofu in display faces. Typographic characters the chosen face actually contains (arrows, bullets) are fine. Backgrounds may alternate between scenes (light/dark) with one consistent accent colour as the default.
 
-  **Shapes go through skia when it is available, text through PIL** (§2). One frame of the hybrid:
+  Shapes go through skia, text through PIL (§2). One frame:
 
   ```python
   import skia, numpy as np
@@ -539,9 +527,7 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
   ImageDraw.Draw(frame).text((80, 180), "KATA", font=ImageFont.truetype(FONT, 110), fill=INK)
   ```
 
-  Without skia, every shape is drawn by PIL and the whole frame is supersampled at 2× (§2).
-
-  **Slow drift needs skia or 2×.** PIL's `ImageDraw` rounds coordinates to whole pixels: a circle moved from x=100.0 to x=100.4 changed **0 pixels**, while skia changed 496. A 0.4 px-per-frame drift is exactly the micro-motion this workflow uses to keep a scene alive, so on PIL alone it renders as a still frame — and the encoder sees a freeze (§7). Either draw the drift in skia, or supersample at 2× so half-pixel steps exist.
+  **Sub-pixel drift is why shapes are drawn in skia.** PIL's `ImageDraw` rounds coordinates to whole pixels: a circle moved from x=100.0 to x=100.4 changed **0 pixels**, while skia changed 496. A 0.4 px-per-frame drift is exactly the micro-motion this workflow uses to keep a scene alive, so under PIL it renders as a still frame — and the encoder sees a freeze (§7).
 - Simulate motion blur by averaging several sub-frames at slightly different times.
 - Render in parallel with resume: because frames are deterministic, draw with several workers (`multiprocessing`, 4–8 processes) and skip frames whose PNG already exists and is non-empty. If a render dies, rerun the same script — only missing frames are redrawn.
 
@@ -739,7 +725,7 @@ def check(ok, msg):
 print("\n".join(findings) if findings else "no findings")
 ```
 
-How to capture drawn text: wrap `ImageDraw.ImageDraw.text` — every text in this pipeline goes through it. Text drawn as a skia path is not captured; verify that scene from the time table instead.
+How to capture drawn text: wrap `ImageDraw.ImageDraw.text` — every text goes through it. Text drawn as a skia path is not captured; verify that scene from the time table instead.
 
 **Sync gate.** For each key text prove two things: it exists at `word_time + 0.10` and does not exist at `word_time − 0.15` (the window is tunable; what matters is its asymmetry — 0.1 s late beats appearing early). Capture all drawn text by wrapping the text call, then match by text name.
 

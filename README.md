@@ -42,10 +42,10 @@ Longer only when you ask. Orientation is chosen in stage 1, before the script is
 git clone https://github.com/bitscoid/bits-motion.git \
   ~/.config/opencode/skills/bits-motion
 
-# 2. check the toolchain (ffmpeg, ffprobe, PIL, numpy; skia recommended)
+# 2. check the toolchain (ffmpeg, ffprobe, PIL, numpy, skia)
 ffmpeg -version | head -1
 python3 -c "import PIL, numpy; print('PIL+numpy ok')"
-python3 -c "import skia; print('skia', skia.__version__)" 2>/dev/null || echo "skia: absent"
+python3 -c "import skia; print('skia', skia.__version__)"
 
 # 3. ask for a video
 "buatkan motion graphic tentang kenapa kopi bikin ngantuk"
@@ -185,15 +185,15 @@ tiga-mitos-otak/
 | Need | Why |
 |---|---|
 | `ffmpeg` + `ffprobe` | rendering, measuring, verification |
-| `python3` + PIL + numpy | frame generation and asset measurement |
-| `skia-python` | **strongly recommended** — antialiased shapes, gradients, blur. Without it, shapes are hard-edged and you must supersample at 2× (186 ms/frame vs 34 ms) |
+| `python3` + PIL + numpy | text, images, frame generation and asset measurement |
+| `skia-python` | **required** — antialiased shapes, gradients, blur, sub-pixel motion |
 | `faster-whisper` | word-level timing (optional, degrades to estimate) |
 | `GEMINI_API_KEY` | optional TTS when you have no recording (Interactions endpoint) |
 | `yt-dlp` | optional, downloading style references |
 
 Verified on ffmpeg 7.1. Every ffmpeg behaviour cited in the docs was measured on a real render, not copied from documentation.
 
-Text is drawn with PIL (FreeType antialiasing, RAQM shaping for Arabic/Indic/Thai); shapes are drawn with skia when it is present.
+Text is drawn with PIL (FreeType antialiasing, RAQM shaping for Arabic/Indic/Thai); shapes are drawn with skia.
 
 Disk and time scale with the cap: a 300 s landscape video is **9000 PNG frames** before encoding. Render with the resume worker and expect the encode to take minutes, not seconds.
 
