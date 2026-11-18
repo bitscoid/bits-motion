@@ -380,7 +380,7 @@ Before writing scene code, give every core point one visual mechanism that can b
 Inspect the exported MP4 from start to finish, not just the timeline editor:
 
 1. Style is inspired by the reference without copying it shot for shot.
-2. Text is legible, correctly spelled, and synced to the narration.
+2. Text is legible, correctly spelled, synced to the narration, and each frame keeps **one label voice**: its captions and footnotes either match the caps-plus-tracking treatment of the other labels or take the display face — never a lone sentence-case sans line among caps (`references/GUIDE.md` §2).
 3. Assets appear at relevant moments, uncropped and undistorted.
 4. Transitions are smooth, varied, and purposeful.
 5. Music supports and speech stays dominant.

@@ -35,7 +35,15 @@ Rules:
 - Preserve spelling and meaning exactly as scripted.
 - Break copy into short phrases. Never show a whole paragraph at once. Highlight keywords only.
 - Keep clear levels: title, keyword, supporting line, small label.
-- Avoid random capitals, hard-to-read faces, and decorative excess.
+- **The label layer speaks with one voice.** Header, index, kicker, chip, caption and footnote are the frame's *meta-copy* — words about the video, not words of the video, read without being heard. Every piece of meta-copy in one frame therefore takes the same treatment:
+  - **uppercase in the supporting sans, tracked 4–8 px**, when the line is short (a label, an index, a chip, a one- to three-word caption); or
+  - **the display face, usually italic**, when the caption reads as a phrase or a sentence rather than a bare label.
+
+  The trap is a single sentence-case sans line left alone among caps labels. It stops reading as part of the design and starts reading as a tooltip or a settings note — the interface voice of the face showing through, which is exactly what makes a frame look like a template.
+- **Do not police case anywhere else.** Spoken content — a claim, a quote, a sentence the narration also says — keeps its natural case and punctuation in whatever face it uses, and a project may deliberately set content lines in sentence-case sans as its "plain voice". The rule above is about meta-copy, not about banning lowercase.
+- **Never uppercase a quoted claim or a proper noun**, even where a label would fit: caps make the frame look like it endorses those words as its own headline. A myth, a quote or a reported claim stays sentence case.
+- **Caps without tracking read as a form, not a label.** Add the tracking, keep the line short, and measure the **cap height** (not the ascender box) against the size tier — uppercase lines are uniform height, so the size that clears 2.5% for mixed case will usually not clear it in caps.
+- Avoid decorative capitalisation inside sentence-case copy, hard-to-read faces, and ornamental excess.
 - Respect the safe area: important elements stay at least **4%** from the frame edge — one number, so there is never a second truth about it (the geometry gate in `RENDER.md` §7 uses 4%).
 
   **Short-form platforms need more.** 4% is the floor for the file itself; on Reels, TikTok, Shorts and Stories the platform UI covers roughly the bottom 12–15% and the right 10–12% with captions, buttons and progress. For a **portrait** export (`1080×1920`), keep primary text inside **10% from the bottom and 12% from the right**, and say in the delivery message which zone you used. Landscape/YouTube keeps the plain 4%. This is a platform constraint, not taste — measure it, and never let a keyword land in the covered band. The 4% gate still runs on everything; the platform band is a second, stricter margin applied on top for portrait.
