@@ -229,26 +229,5 @@ Text without a supporting word in the voiceover remains legitimate (silent empha
 - Prevent clipping, distortion, sudden level changes, and unintended silence. Measure the finished mix: **I between −17 and −14 LUFS, true peak ≤ −1 dBTP** (`RENDER.md` §7). A quiet mix passes every other gate and still plays badly on every platform.
 - Music must be **looped to the video length**, not played once (`-stream_loop -1`). A 10 s track on a 28 s video otherwise leaves 18 s of silence.
 - If you download a track instead of synthesising one, apply the same licence rule as images (`RENDER.md` §4): public domain, CC0, or an explicit permissive licence, credited in the delivery message.
-- If the video is a beat-driven piece, derive the beat grid from the music instead of guessing: a tempo estimate plus the scene-change times is enough to snap transitions to the pulse. Keep it subtle — the narration leads, the beat supports.
-
-Tempo from the music itself — onset strength, then the median gap between onsets:
-
-```python
-import wave, numpy as np
-w = wave.open("audio/music.wav"); sr = w.getframerate()
-a = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
-hop = int(sr * 0.01)                                  # 10 ms resolution
-env = np.array([np.abs(a[i:i+hop]).max() for i in range(0, len(a) - hop, hop)])
-d = np.diff(env)
-peaks = [i for i in range(1, len(d)) if d[i] > 0.15 and d[i] >= d[i - 1]]
-onsets, last = [], None
-for p in peaks:                                       # collapse a hit into one onset
-    if last is None or p - last > 10:
-        onsets.append(p); last = p
-gap = np.median(np.diff(onsets)) * 0.01               # seconds per beat
-bpm, beat = 60 / gap, gap
-```
-
-Measured on a synthetic 120 BPM click: median gap 0.500 s → 120 BPM, 31 onsets over 16 s. Treat the result as a grid to snap optional accents onto, never as a requirement that scenes start on beats.
 
 If the user has no music: build simple background music that fits the visual style (`RENDER.md` §8) and say plainly that it is synthesised music. Alternatively render silent and suggest the user add royalty-free music.

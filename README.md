@@ -206,13 +206,13 @@ Disk and time scale with the cap: a 300 s landscape video is **9000 PNG frames**
 | **`references/GUIDE.md`** | creative direction — typography, animation, transitions, turning ideas into visuals |
 | **`references/RENDER.md`** | engineering — environment, fonts, ffmpeg, and the QC gates |
 
-Every measured number lives in `RENDER.md`. Every creative freedom lives in `GUIDE.md`. Neither pretends to be the other.
+The measured numbers live with the rule they protect; the creative freedoms live in `GUIDE.md`. Neither pretends to be the other.
 
 ---
 
 ## 🎨 Fonts
 
-The catalogue ships **38 families across 8 registers** as a starting point, never a menu. If the topic needs typography that isn't there, the skill downloads it:
+The catalogue ships **38 families across 9 registers** as a starting point, never a menu. If the topic needs typography that isn't there, the skill downloads it:
 
 ```bash
 curl -sL -o /tmp/font.ttf \

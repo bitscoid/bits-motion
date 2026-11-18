@@ -4,7 +4,7 @@ Read this before building and rendering. All commands are examples — adapt fil
 
 ## Contents
 1. Environment check
-2. The render pipeline: PIL for text, skia for shapes
+2. The render pipeline
 3. Measuring and analysing the voiceover
 4. Analysing a reference video
 5. Building frames deterministically
@@ -72,11 +72,11 @@ Match to the video's mood (one display + one supporting usually covers it):
 | Modern, neutral, UI-like | `Poppins` (Regular/SemiBold/Bold), `Inter`, `Montserrat`, `Manrope`, `DM Sans`, `Figtree` | Safe standard for narration and body text |
 | Playful, doodle, rounded | `Baloo 2`, `Fredoka`, `Quicksand`, `Nunito`, `Gochi Hand` | Light topics, informal education, children/youth |
 | Handwriting, annotation | `Caveat`, `Patrick Hand`, `Indie Flower`, `Kalam`, `Gochi Hand` | Annotation accents, arrows, scribbles |
-| Elegant / retro script | `Pacifico`, `Dancing Script`, `Shrikhand` | Wordmarks, casual headlines — never body text |
+| Elegant / retro script | `Pacifico`, `Dancing Script`, `Shrikhand` | Wordmarks, casual headlines — rarely body text |
 | Impact, kinetic type | `Bebas Neue`, `Anton`, `Archivo Black`, `Oswald`, `Archivo`, `Unbounded`, `Syne` | Big keywords, hooks, statistics |
 | Editorial / firm serif | `Fraunces`, `Instrument Serif`, `Libre Caslon Text`, `DM Serif Display`, `Newsreader`, `Gloock` | Quotes, large figures, history or serious topics |
 | Technical / data / mono | `JetBrains Mono`, `Space Mono`, `Space Grotesk`, `IBM Plex Mono`, `Sora`, `Epilogue` | Small labels, statistics, data and tech feel |
-| Expressive / display | `Bricolage Grotesque`, `Shrikhand`, `Unbounded`, `Syne` | Titles that carry personality — use once per video, never for body |
+| Expressive / display | `Bricolage Grotesque`, `Shrikhand`, `Unbounded`, `Syne` | Titles that carry personality — usually once per video |
 
 Mix across categories freely. The catalogue widens the range of moods available; it does not prescribe which one to pick.
 
@@ -123,10 +123,10 @@ If all three routes fail, use an installed font and say so — do not fall back 
 
 ```python
 from PIL import ImageFont
-f = ImageFont.truetype("/tmp/outfit.ttf", 80)
+f = ImageFont.truetype("/tmp/outfit.ttf", 80)   # route 3 saves /tmp/<slug>-<weight>.ttf
 print(f.getname())                        # the real family name, not the filename
 print(f.getbbox("Baca Tulis"))            # must return a box, not raise
-f.set_variation_by_axes([700])            # only for a variable font, not for route 3
+f.set_variation_by_axes([700])            # variable fonts only, not a route-3 instance
 ```
 
 Under 10 KB means an HTML error page, not a font. Copy it to `~/.local/share/fonts/motion/` using the family name (e.g. `Outfit.ttf`) and pass the path directly to PIL.
@@ -446,10 +446,8 @@ Filter before use — check with `ffprobe` and discard candidates that: run unde
 **Aspect ratio, not resolution.** A reference teaches style — palette, typography, composition, cut rhythm — and every one of those reads perfectly from a smaller frame. 720×1280 is a valid reference for a 1080×1920 build, and 1280×720 for a 1920×1080 build: same orientation, same 9:16 (or 16:9) geometry. What matters when comparing:
 
 - **orientation** must match the planned output (portrait ref → portrait build; landscape ref → landscape build);
-- **aspect ratio** within a small tolerance (±2% on the ratio; 720×1280, 1080×1920, 2160×3840 are all exactly 9:16 — a 9:16 crop of a 1:1 or 16:9 clip is *not* the same geometry and misleads composition analysis);
+- **aspect ratio** within a small tolerance (±2% on the ratio; 720×1280, 1080×1920, 2160×3840 are all exactly 9:16 — a crop that changes the geometry is *not* the same composition and misleads the analysis);
 - **resolution is irrelevant** for a reference (it is analysed at reduced scale anyway — contact sheets are drawn at 240–480 px wide), and never a reason to reject.
-
-A 1:1 square reference can still serve as a *mood* anchor (palette, typography register) when nothing else exists, but never as a composition/rhythm anchor — note that limitation in one line when you use it.
 
 **When the user supplies the Pinterest URL themselves**, skip the search entirely: that URL is the reference. Download it with the same command. If it fails (region block, removed pin, no video stream), say so once, then fall back to the search order above — never silently drop the style anchor.
 

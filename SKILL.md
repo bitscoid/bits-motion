@@ -76,8 +76,6 @@ Every number left in these documents **protects** something (legibility, safe ar
 
 Never treat anything in `references/` as a template. What transfers is the measuring method, not the measured result. The font catalogue is a starting point, not a menu — if the topic needs typography that isn't installed, download it.
 
-If example projects are ever added under `references/examples/`: they must come **in opposite-esthetic pairs** (a single example always becomes the norm), document their **revisions** (v1 → v2 with the reason for each change), and never ship copy-ready render code. Without all three, examples damage more than they help.
-
 One exception that is commonly misread: on-screen text **does not** need a supporting word in the voiceover. Silent emphasis is legitimate — just record the reason in the timeline.
 
 **QC gates flag, they do not judge.** When a check reports a finding, decide: a defect to fix, or an intentional choice to document. Passing every gate means "not broken", never "good".
@@ -425,11 +423,11 @@ Before writing scene code, give every core point one visual mechanism that can b
 Inspect the exported MP4 from start to finish, not just the timeline editor:
 
 1. Style is inspired by the reference without copying it shot for shot — checked against the style brief in the header of `render.py`: every line still holds, the signature device is present, and at least one decision came from the topic rather than the reference.
-2. Text is legible, correctly spelled, and synced to the narration. Captions and footnotes sit inside the safe area and are never mistaken for words the narration says (`references/GUIDE.md` §2 is guidance, not a gate).
+2. Text is legible, correctly spelled, and synced to the narration. Captions and footnotes sit inside the safe area and are never mistaken for words the narration says.
 3. Assets appear at relevant moments, uncropped and undistorted.
 4. Transitions are smooth, varied, and purposeful.
 5. Music supports and speech stays dominant.
-6. No black frames, frozen frames, glitches, or unintended audio defects.
+6. No black frames, **undocumented** frozen frames, glitches, or unintended audio defects.
 7. The MP4 plays. Actual duration equals the stage-4 total (never over the active cap), frame count = duration × 30, 30 fps, codec and resolution per spec, nothing after the final second, and the cap in use is stated (60 s portrait, 300 s landscape, or the number the user approved). All of it proven from the exported file's metadata.
 8. The measurements in `references/RENDER.md` §7 are run and reported: sync (no text appears before its word), geometry (safe area, cap height, collision, contrast), audio (no dead air inside the speech region; music present in the tail when music exists; mix I ∈ [−17, −14] LUFS, true peak ≤ −1 dBTP), and repetition pattern (flag only, your call). Two of them are hard requirements — frame contiguity before encoding, and the finished loudness and tail floor. The rest are advisory: report the numbers and the decision you made from them.
 9. `output/publish.txt` exists and every block in it is copy-paste ready — see *Publish copy* below. It is part of the deliverable, not an extra.
