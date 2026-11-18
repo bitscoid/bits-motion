@@ -82,7 +82,7 @@ Mix across categories freely. **2–3 families is the range that usually reads a
 
 For a script the catalogue does not cover (Arabic, Devanagari, CJK, Thai), download a family that supports it and verify **shaping**, not just glyph presence. PIL needs a Raqm-enabled build for correct Arabic and Indic joining (`ImageFont.Layout.RAQM`), and a font that only renders isolated forms ships broken text. Test a real sentence from the script before building a scene around it.
 
-Usage: in PIL pass the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`) — nothing in this pipeline resolves a font by family name. Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file; in PIL call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
+Usage: in PIL pass the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`). Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file; call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
 
 ### Adding a new font
 
@@ -108,7 +108,7 @@ print('pick:', pick)
 print('url :', 'https://github.com/google/fonts/raw/main/ofl/$SLUG/' + urllib.parse.quote(pick))
 "
 
-# 3) if GitHub is blocked: ask Google's CSS API for a direct TTF (no npm needed).
+# 3) if GitHub is blocked: ask Google's CSS API for a direct TTF.
 #    The "Mozilla/4.0" UA is deliberate -- modern UAs get woff2, which PIL cannot
 #    read; this one gets a static .ttf per weight, ready for ImageFont.truetype.
 SLUG=outfit; WEIGHT=700
@@ -131,13 +131,13 @@ print(f.getbbox("Baca Tulis"))            # must return a box, not raise
 f.set_variation_by_axes([700])            # only for a variable font, not for route 3
 ```
 
-Under 10 KB means an HTML error page, not a font. Copy it to `~/.local/share/fonts/motion/` using the family name (e.g. `Outfit.ttf`) and pass the path directly to PIL — no `fc-cache` needed, because nothing in this pipeline resolves fonts by family name.
+Under 10 KB means an HTML error page, not a font. Copy it to `~/.local/share/fonts/motion/` using the family name (e.g. `Outfit.ttf`) and pass the path directly to PIL.
 
 Choose the font that **suits the topic**, not the one that is easiest to download. If every download fails, use what is installed and tell the user the ideal typography was not reached — never quietly fall back to a bad default (§9).
 
 ## 2. The render pipeline
 
-One pipeline: **Python draws every frame deterministically from `t = frame_index / 30`, then ffmpeg assembles it.** That is what makes the frame count exactly duration × 30 and lets animation sync to the timeline. One language, one entry point.
+Python draws every frame deterministically from `t = frame_index / 30`, then ffmpeg assembles it. That is what makes the frame count exactly duration × 30 and lets animation sync to the timeline.
 
 ```bash
 pip install pillow numpy            # required
@@ -151,18 +151,16 @@ pip install skia-python             # strongly recommended, see below
 | PIL (`ImageDraw`) | text with FreeType antialiasing, images, simple shapes | **2.0 ms/frame**, low memory | **all text**, images, plain rectangles |
 | skia-python (`skia.Surface`) | antialiased paths, gradients, blur, masks, blend modes, clipping | **34.5 ms/frame**, 9 MB peak | shapes, diagrams, gradients, blur, clipping |
 
-The rule that keeps both honest: **skia for shapes, PIL for text.** Draw the frame in skia, take `makeImageSnapshot()` to a numpy array, `Image.fromarray(...)`, then draw text with PIL on top. Measured cost of that hybrid: **38 ms/frame** — against **564 ms** for the common alternative of drawing everything at 4× and downscaling.
+The split: **skia for shapes, PIL for text.** Draw the frame in skia, take `makeImageSnapshot()` to a numpy array, `Image.fromarray(...)`, then draw text with PIL on top. Measured cost of that hybrid: **38 ms/frame**.
 
-Why not one tool for both:
+The split is forced by two measured limits:
 
-- **skia cannot shape text.** `drawString` measured **439 px** for `مرحبا بالعالم` where PIL + RAQM measures **307 px** — isolated letters instead of joined script. The paragraph API in skia-python 144.1 is incomplete (`ParagraphBuilder` requires a `Unicode` object, has no `popStyle`, and `Canvas.drawParagraph` is missing). Text stays in PIL, with `layout_engine=ImageFont.Layout.RAQM` for Arabic, Indic and Thai.
+- **skia cannot shape text.** `drawString` measured **439 px** for `مرحبا بالعالم` where PIL + RAQM measures **307 px** — isolated letters instead of joined script. Text stays in PIL, with `layout_engine=ImageFont.Layout.RAQM` for Arabic, Indic and Thai.
 - **PIL cannot antialias shapes, and it rounds to whole pixels.** A circle drawn with `ellipse` has one hard step at the edge — measured 2 distinct values across the transition, against fractional coverage in skia. It also snaps coordinates: moving a circle from x=100.0 to x=100.4 changed **0 pixels** (skia: 496). Invisible on a rectangle, obvious on a diagonal, a circle, or a line thinner than 3 px — and fatal to sub-pixel drift.
-
-**Do not use cairosvg.** It silently ignores `<filter>` (a `feGaussianBlur` produced **one** unique value down the column — no blur at all) and `<mask>` (a `#808080` mask rendered **255**, fully opaque), and it does not shape Arabic either. A rasteriser that drops a blur or a mask with no error is worse than one that cannot draw it: the scene ships looking flat and nobody knows why.
 
 ### If skia is unavailable
 
-Supersample, but at **2×, not 4×**: measured **186 ms/frame and ~40 MB** against **564 ms and 160 MB** at 4× — on a 300-second landscape video, 28 minutes against 85. Text does not need it; FreeType already antialiases glyphs. When time is short, supersample the shapes only, or accept hard edges on small elements and keep the text sharp.
+Supersample at **2×**: measured **186 ms/frame and ~40 MB**. Text does not need it; FreeType already antialiases glyphs. When time is short, supersample the shapes only, or accept hard edges on small elements and keep the text sharp.
 
 Check what you actually have before claiming it — a rasteriser that is assumed installed fails deep into a render:
 
@@ -173,11 +171,9 @@ python3 -c "import skia; print('skia', skia.__version__)" 2>/dev/null \
 
 If installation fails (blocked network, no permission), report the reason and continue on PIL alone. Never silently degrade quality, and never claim a rasteriser you have not verified. If nothing runs at all, follow "Honesty about the result" in `SKILL.md`.
 
-There is no Node step in this pipeline: `package.json`, `tsconfig.json`, `.npmrc` and `node_modules/` have no place in the project.
-
 Store frames as `work/frames/00000.png` through `work/frames/01199.png`. To save memory you can pipe straight into ffmpeg (`-f rawvideo -pix_fmt rgb24 -s WxH -r 30 -i -`).
 
-The build script is **`render.py`** — one entry point, one file. Helper modules (`lib/`, `make_music.py`) are fine as long as `render.py` is the only thing you run end to end. Never carry a second entry point or a second language.
+The build script is **`render.py`**. Helper modules (`lib/`, `make_music.py`) are fine as long as `render.py` is the only thing you run end to end.
 
 ## 3. Measuring and analysing the voiceover
 
@@ -543,7 +539,7 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
   ImageDraw.Draw(frame).text((80, 180), "KATA", font=ImageFont.truetype(FONT, 110), fill=INK)
   ```
 
-  Without skia, every shape is drawn by PIL and the whole frame is supersampled at 2× (§2) — never 4×.
+  Without skia, every shape is drawn by PIL and the whole frame is supersampled at 2× (§2).
 
   **Slow drift needs skia or 2×.** PIL's `ImageDraw` rounds coordinates to whole pixels: a circle moved from x=100.0 to x=100.4 changed **0 pixels**, while skia changed 496. A 0.4 px-per-frame drift is exactly the micro-motion this workflow uses to keep a scene alive, so on PIL alone it renders as a still frame — and the encoder sees a freeze (§7). Either draw the drift in skia, or supersample at 2× so half-pixel steps exist.
 - Simulate motion blur by averaging several sub-frames at slightly different times.
@@ -728,7 +724,7 @@ ffmpeg -hide_banner -nostats -i output/<slug>.mp4 -af ebur128=peak=true -f null 
 
 Target: **I between −17 and −14 LUFS** (a −16 LUFS voiceover with ducked music lands near −16, measured −16.0 on a 28 s build) and **true peak ≤ −1 dBTP**. A build with the voiceover turned down to 15% measured **−32.5 LUFS** — that is the failure this gate exists for. Report both numbers in the delivery message; `max_volume` alone does not describe loudness.
 
-**Write the sync, geometry, and repetition checks yourself when needed.** The rules are complete in prose below and in `GUIDE.md` §2: safe area 4%, two-tier cap height, contrast per role, collision cover, repetition patterns. Translate them into code against your renderer's data structures.
+**Write the sync, geometry, and repetition checks yourself when needed.** The rules are complete in prose below and in `GUIDE.md` §2: safe area 4%, two-tier cap height, contrast per role, collision cover, repetition patterns. Translate them into code against the shapes your own scene code draws.
 
 Suggested shape: collect every text bbox during render, then inspect at the end. Two checks are hard requirements — frame contiguity before encoding (§6) and the loudness/tail floor above. Everything in this section is **advice, not PASS/FAIL**: collect findings, print them, and decide. A gate that stops the script on the first finding hides the other four.
 
@@ -743,14 +739,7 @@ def check(ok, msg):
 print("\n".join(findings) if findings else "no findings")
 ```
 
-How to capture drawn text. Text is always drawn by PIL in this pipeline, so the capture point is one wrapper:
-
-| What was drawn | Capture text | Capture frames |
-|---|---|---|
-| PIL `ImageDraw.text` | wrap the method: `orig = ImageDraw.ImageDraw.text; def patched(self, xy, s, *a, **kw): seen.append((s, xy)); return orig(self, xy, s, *a, **kw)` | call the frame function directly |
-| PIL `ImageFont.getbbox` | use it for the measured box; it does not draw | — |
-
-If a scene draws text through skia instead of PIL (it should not — skia cannot shape script), that text is invisible to the gate. Keep text in PIL and the gate stays complete. When no capture is possible, verify timing from the **time table** the renderer uses (find values satisfying `text_time >= word_time`) and tell the user the check was table-based, not pixel-based.
+How to capture drawn text: wrap `ImageDraw.ImageDraw.text` — every text in this pipeline goes through it. Text drawn as a skia path is not captured; verify that scene from the time table instead.
 
 **Sync gate.** For each key text prove two things: it exists at `word_time + 0.10` and does not exist at `word_time − 0.15` (the window is tunable; what matters is its asymmetry — 0.1 s late beats appearing early). Capture all drawn text by wrapping the text call, then match by text name.
 
@@ -931,9 +920,6 @@ Use at most a few per video, always below the voiceover level, and tell the user
 ## 9. Common traps
 
 - **VFR (variable frame rate):** force CFR with `-r 30`. Verify `r_frame_rate` and `avg_frame_rate` both read 30/1.
-- **cairosvg drops effects with no error.** Measured on 2.9.1: `feGaussianBlur stdDeviation=6` produced **one** unique value down the blurred column, and a `#808080` mask rendered **255** (fully opaque). A scene built on SVG filters ships flat and nothing reports it. Do not add cairosvg back — use skia for blur, mask and gradient.
-- **skia `drawString` does not shape script.** Measured: `مرحبا بالعالم` renders **439 px** wide against **307 px** from PIL with `layout_engine=ImageFont.Layout.RAQM` — isolated letters, not joined. Draw text with PIL always; skia draws shapes only.
-- **4× supersampling costs 85 minutes, not 5.** Measured at 1080×1920 with six shapes: 564 ms/frame at 4×, 186 ms at 2×, 34 ms with skia. If skia is missing, supersample at 2× — glyphs are already antialiased by FreeType, so the extra factor buys almost nothing.
 - **Duration off by a frame:** usually the drawn frame count differs from `DUR × 30`. Recount before encoding.
 - **Audio longer than video** (or the reverse): use `apad=whole_dur=$DUR` and `atrim=0:$DUR` as in the example, plus `-t $DUR`.
 - **Font not found:** check `fc-list`, or download it through the recipe in §1 — never silently fall back to an ugly default.

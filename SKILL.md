@@ -125,7 +125,7 @@ tiga-mitos-otak/
 
 **`audio/words.json` is outside `work/` on purpose.** It is the only derived file a revision cannot cheaply recreate: re-running ASR after a cleanup returns timestamps that differ by ~±0.1 s from the ones the pictures were synced to, so a re-render would drift. Keeping it in `audio/` makes `rm -rf work` lose nothing that matters, and `render.py` reads it from there. Everything else in `work/` is either an input (`audio/`, `assets/`) or rebuildable in one command.
 
-`render.py` is the build script and the only entry point — one file, one language. Never a second entry point. Helper modules are fine (`lib/`, `make_music.py`) as long as `render.py` is the only thing you run end to end.
+`render.py` is the build script and the only entry point. Helper modules are fine (`lib/`, `make_music.py`) as long as `render.py` is the only thing you run end to end.
 
 Never create empty directories. No images means no `assets/`. No music means no `audio/music.wav`.
 
@@ -167,7 +167,7 @@ If two candidates could both be the voiceover, or a file's role stays unclear af
 
 `project.json`, `timing.json`, `scenes.py`, `manifest.json`, `style.json`, `review/`, or a separate QC report. Creative decisions (font, voice, palette) are agreed with the user and live in `render.py`; check results are reported directly in the delivery message. Three exceptions, because they are data and not reports: `audio/words.json` (word timings), the optional `output/<slug>.srt`, and `output/publish.txt` (platform upload copy).
 
-Tool configuration a Python pipeline needs — `requirements.txt`, `pyproject.toml`, `.venv/` — is not a project document: create it when the environment requires it. The ban is on parallel sources of truth. This pipeline has no Node step, so `package.json`, `tsconfig.json` and `node_modules/` never appear.
+Tool configuration a Python pipeline needs — `requirements.txt`, `pyproject.toml`, `.venv/` — is not a project document: create it when the environment requires it. The ban is on parallel sources of truth.
 
 ### Starting behaviour
 
@@ -412,7 +412,7 @@ Read both reference documents before building anything:
 - `references/GUIDE.md` — creative direction, typography, asset animation, transitions, **translating ideas into visuals (§5), cross-scene variation (§6)**, audio mixing.
 - `references/RENDER.md` — environment check, fonts, the render pipeline (PIL for text, skia for shapes), ffmpeg commands, verification.
 
-**Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier cap height, WCAG contrast, text collision (coverage), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against your renderer's data structures. Do not look for a shared library; every project has its own shapes.
+**Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier cap height, WCAG contrast, text collision (coverage), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against the shapes your own scene code draws. Every project has its own shapes.
 
 Two checks are not optional because they protect the file itself, and both catch failures that look fine on screen:
 - **frame contiguity** before encoding (`RENDER.md` §6) — a missing PNG silently truncates the MP4;
