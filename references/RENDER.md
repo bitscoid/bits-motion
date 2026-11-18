@@ -4,7 +4,7 @@ Read this before building and rendering. All commands are examples — adapt fil
 
 ## Contents
 1. Environment check
-2. Choosing a render pipeline
+2. The render pipeline: PIL for text, skia for shapes
 3. Measuring and analysing the voiceover
 4. Analysing a reference video
 5. Building frames deterministically
@@ -22,8 +22,8 @@ Run this first and plan around the result:
 ffmpeg -version | head -1; ffprobe -version | head -1
 ffmpeg -hide_banner -encoders 2>/dev/null | grep -E "(libx264|aac)" || echo "WARNING: libx264/aac encoder missing"
 python3 -c "import PIL, numpy; print('PIL+numpy ok')"
+python3 -c "import skia; print('skia', skia.__version__)" 2>/dev/null || echo "skia: absent (shapes will be hard-edged; supersample at 2x)"
 python3 -c "import faster_whisper; print('word-level ASR: available')" 2>/dev/null || echo "ASR: unavailable (pip install faster-whisper; without it word timing becomes an estimate -- tell the user)"
-node -v
 fc-list | head -20          # available fonts
 [ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API_KEY: present" || echo "GEMINI_API_KEY: absent"
 which curl yt-dlp           # curl for TTS, yt-dlp for URL references
@@ -31,7 +31,7 @@ NC=$(timeout 8 curl -s -o /dev/null -w '%{http_code}' https://generativelanguage
 case "$NC" in 200|403|404) echo "network: OK (HTTP $NC)";; *) echo "network: PROBLEM (HTTP $NC / timeout)";; esac
 ```
 
-Network access is often restricted. Check what actually works: if `pip` and `npm` run, extra fonts can come from `@fontsource/<font-name>`; if external downloads are blocked, use fonts already on the system. The ffmpeg version dictates which options are legal (see §6).
+Network access is often restricted. Check what actually works: if `pip` runs, `pip install skia-python` is the one dependency worth adding; extra fonts come from the Google Fonts route in §1. If external downloads are blocked, use fonts already on the system. The ffmpeg version dictates which options are legal (see §6).
 
 ### Vision capability (measured, never assumed)
 
@@ -82,7 +82,7 @@ Mix across categories freely. **2–3 families is the range that usually reads a
 
 For a script the catalogue does not cover (Arabic, Devanagari, CJK, Thai), download a family that supports it and verify **shaping**, not just glyph presence. PIL needs a Raqm-enabled build for correct Arabic and Indic joining (`ImageFont.Layout.RAQM`), and a font that only renders isolated forms ships broken text. Test a real sentence from the script before building a scene around it.
 
-Usage: in CSS/Remotion use the family name exactly as `fc-list` reports it (e.g. `"Baloo 2"`, `"Bebas Neue"`); in PIL use the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`). Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file — set `font-weight` in CSS, or in PIL call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
+Usage: in PIL pass the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`) — nothing in this pipeline resolves a font by family name. Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file; in PIL call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
 
 ### Adding a new font
 
@@ -108,51 +108,76 @@ print('pick:', pick)
 print('url :', 'https://github.com/google/fonts/raw/main/ofl/$SLUG/' + urllib.parse.quote(pick))
 "
 
-# 3) if GitHub is blocked: npm @fontsource (the package ships woff2 + ttf)
-npm pack "@fontsource/$SLUG" --silent && tar -xzf fontsource-$SLUG-*.tgz && \
-  find package -name "*.ttf" | head
+# 3) if GitHub is blocked: ask Google's CSS API for a direct TTF (no npm needed).
+#    The "Mozilla/4.0" UA is deliberate -- modern UAs get woff2, which PIL cannot
+#    read; this one gets a static .ttf per weight, ready for ImageFont.truetype.
+SLUG=outfit; WEIGHT=700
+URL=$(curl -s -A "Mozilla/4.0" "https://fonts.googleapis.com/css?family=Outfit:$WEIGHT" \
+  | python3 -c "import sys,re; m=re.search(r'url\((https://[^)]+\.ttf)\)', sys.stdin.read()); print(m.group(1) if m else '')")
+[ -n "$URL" ] && curl -sL -o "/tmp/$SLUG-$WEIGHT.ttf" "$URL"
 ```
 
-Once you have the file, **verify before using it in a scene** — a broken file or a non-font failure surfaces deep into a render:
+Route 3 returns a **static instance** of one weight, not a variable font — do not call `set_variation_by_axes` on it.
+
+If all three routes fail, use an installed font and say so — do not fall back to a font that renders tofu.
+
+**Verify before using it in a scene** — a broken download surfaces deep into a render:
 
 ```python
 from PIL import ImageFont
 f = ImageFont.truetype("/tmp/outfit.ttf", 80)
-print(f.getname())                       # the real family name, not the filename
-d.textbbox((0, 0), "Baca Tulis", font=f)  # must return a box, not raise
-f.set_variation_by_axes([700])           # only for variable fonts
+print(f.getname())                        # the real family name, not the filename
+print(f.getbbox("Baca Tulis"))            # must return a box, not raise
+f.set_variation_by_axes([700])            # only for a variable font, not for route 3
 ```
 
-Under 10 KB means an HTML error page, not a font. Copy it to `~/.local/share/fonts/motion/` using the family name (e.g. `Outfit.ttf`), then `fc-cache -f` if you reference it by family in CSS. For PIL a direct path is enough — no `fc-cache` needed.
+Under 10 KB means an HTML error page, not a font. Copy it to `~/.local/share/fonts/motion/` using the family name (e.g. `Outfit.ttf`) and pass the path directly to PIL — no `fc-cache` needed, because nothing in this pipeline resolves fonts by family name.
 
 Choose the font that **suits the topic**, not the one that is easiest to download. If every download fails, use what is installed and tell the user the ideal typography was not reached — never quietly fall back to a bad default (§9).
 
-## 2. Choosing a render pipeline
+## 2. The render pipeline
 
-The principle: render every frame deterministically from time `t = frame_index / 30`, then assemble with ffmpeg. This makes the frame count exactly duration × 30 and makes animation easy to sync to the timeline.
-
-| Pipeline | Good for | Requires |
-|---|---|---|
-| Python (Pillow/numpy, optionally cairosvg or skia-python) | Text, shapes, user images, masks, parallax | PIL and numpy |
-| HTML/CSS/JS + headless browser (screenshot per frame) | Complex typography, SVG, CSS blur and shadows | A working headless browser |
-| Remotion / Node | React-based compositions | Node plus headless browser |
-| ffmpeg filtergraph / MoviePy | Simple compositions | ffmpeg |
-
-Pick the pipeline that best fits the composition, not the one that happens to be installed. Install missing dependencies before rendering:
+One pipeline: **Python draws every frame deterministically from `t = frame_index / 30`, then ffmpeg assembles it.** That is what makes the frame count exactly duration × 30 and lets animation sync to the timeline. One language, one entry point.
 
 ```bash
-pip install pillow numpy cairosvg     # Python pipeline
-npx playwright install chromium       # headless browser (HTML/CSS or Remotion)
-npm install                           # Remotion project deps, then npx remotion render
+pip install pillow numpy            # required
+pip install skia-python             # strongly recommended, see below
 ```
 
-If installation fails (blocked network, no permission), stop and report it with the reason. Never silently drop to a simpler pipeline — visual quality degrades without the user knowing. Only continue with a simpler pipeline once the user agrees after hearing the consequences. If nothing runs at all, follow "Honesty about the result" in `SKILL.md`.
+### Two rasterisers, one file
 
-`package.json`, `tsconfig.json`, `.npmrc` and `node_modules/` are tool configuration, not project documents — create them when the pipeline needs them. The ban on extra files is about parallel sources of truth (`timing.json`, `scenes.py`, `manifest.json`), not about the toolchain.
+| Rasteriser | Draws | Measured, 1080×1920 | Use it for |
+|---|---|---|---|
+| PIL (`ImageDraw`) | text with FreeType antialiasing, images, simple shapes | **2.0 ms/frame**, low memory | **all text**, images, plain rectangles |
+| skia-python (`skia.Surface`) | antialiased paths, gradients, blur, masks, blend modes, clipping | **34.5 ms/frame**, 9 MB peak | shapes, diagrams, gradients, blur, clipping |
+
+The rule that keeps both honest: **skia for shapes, PIL for text.** Draw the frame in skia, take `makeImageSnapshot()` to a numpy array, `Image.fromarray(...)`, then draw text with PIL on top. Measured cost of that hybrid: **38 ms/frame** — against **564 ms** for the common alternative of drawing everything at 4× and downscaling.
+
+Why not one tool for both:
+
+- **skia cannot shape text.** `drawString` measured **439 px** for `مرحبا بالعالم` where PIL + RAQM measures **307 px** — isolated letters instead of joined script. The paragraph API in skia-python 144.1 is incomplete (`ParagraphBuilder` requires a `Unicode` object, has no `popStyle`, and `Canvas.drawParagraph` is missing). Text stays in PIL, with `layout_engine=ImageFont.Layout.RAQM` for Arabic, Indic and Thai.
+- **PIL cannot antialias shapes, and it rounds to whole pixels.** A circle drawn with `ellipse` has one hard step at the edge — measured 2 distinct values across the transition, against fractional coverage in skia. It also snaps coordinates: moving a circle from x=100.0 to x=100.4 changed **0 pixels** (skia: 496). Invisible on a rectangle, obvious on a diagonal, a circle, or a line thinner than 3 px — and fatal to sub-pixel drift.
+
+**Do not use cairosvg.** It silently ignores `<filter>` (a `feGaussianBlur` produced **one** unique value down the column — no blur at all) and `<mask>` (a `#808080` mask rendered **255**, fully opaque), and it does not shape Arabic either. A rasteriser that drops a blur or a mask with no error is worse than one that cannot draw it: the scene ships looking flat and nobody knows why.
+
+### If skia is unavailable
+
+Supersample, but at **2×, not 4×**: measured **186 ms/frame and ~40 MB** against **564 ms and 160 MB** at 4× — on a 300-second landscape video, 28 minutes against 85. Text does not need it; FreeType already antialiases glyphs. When time is short, supersample the shapes only, or accept hard edges on small elements and keep the text sharp.
+
+Check what you actually have before claiming it — a rasteriser that is assumed installed fails deep into a render:
+
+```bash
+python3 -c "import skia; print('skia', skia.__version__)" 2>/dev/null \
+  || echo "skia: absent (shapes will be hard-edged; supersample at 2x)"
+```
+
+If installation fails (blocked network, no permission), report the reason and continue on PIL alone. Never silently degrade quality, and never claim a rasteriser you have not verified. If nothing runs at all, follow "Honesty about the result" in `SKILL.md`.
+
+There is no Node step in this pipeline: `package.json`, `tsconfig.json`, `.npmrc` and `node_modules/` have no place in the project.
 
 Store frames as `work/frames/00000.png` through `work/frames/01199.png`. To save memory you can pipe straight into ffmpeg (`-f rawvideo -pix_fmt rgb24 -s WxH -r 30 -i -`).
 
-The build script is `render.<ext>` — `render.py` for the Python pipeline, `render.mjs` for Remotion, and so on. Same file, extension follows the pipeline; never carry two entry points. Helper modules (`lib/`, `make_music.py`) are fine as long as `render.<ext>` is the only thing you run end to end.
+The build script is **`render.py`** — one entry point, one file. Helper modules (`lib/`, `make_music.py`) are fine as long as `render.py` is the only thing you run end to end. Never carry a second entry point or a second language.
 
 ## 3. Measuring and analysing the voiceover
 
@@ -411,7 +436,7 @@ Two closing reads, both required:
 
 The reference is a **floor, not a ceiling**. At least one decision — a motif, a material, a motion idea from another medium — must come from the topic and be absent from the reference. A build that only matches its reference is a copy with extra steps.
 
-### Pass 4 — write the brief into `render.<ext>`
+### Pass 4 — write the brief into `render.py`
 
 Ten lines, written before the first scene and kept as the header comment of the build script — not a separate file (`SKILL.md` → *Project layout*: one source of truth). Update a line when a decision changes; stage 7 checks the export against it.
 
@@ -502,6 +527,25 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
   - avoid constant speed unless deliberate;
   - idle elements move in **position**, not just radius/scale (see the encoder note above).
 - Draw icons and diagrams from code shapes (donut, bar, briefcase, bulb) — never emoji or symbol codepoints, which render as tofu in display faces. Typographic characters the chosen face actually contains (arrows, bullets) are fine. Backgrounds may alternate between scenes (light/dark) with one consistent accent colour as the default.
+
+  **Shapes go through skia when it is available, text through PIL** (§2). One frame of the hybrid:
+
+  ```python
+  import skia, numpy as np
+  from PIL import Image, ImageDraw, ImageFont
+
+  surf = skia.Surface(W, H)
+  c = surf.getCanvas()
+  c.clear(skia.Color(*BG))
+  c.drawCircle(x, y, r, skia.Paint(AntiAlias=True, Color=skia.Color(*ACCENT)))
+  arr = surf.makeImageSnapshot().toarray()          # BGRA
+  frame = Image.fromarray(arr[..., :3][..., ::-1])   # -> RGB
+  ImageDraw.Draw(frame).text((80, 180), "KATA", font=ImageFont.truetype(FONT, 110), fill=INK)
+  ```
+
+  Without skia, every shape is drawn by PIL and the whole frame is supersampled at 2× (§2) — never 4×.
+
+  **Slow drift needs skia or 2×.** PIL's `ImageDraw` rounds coordinates to whole pixels: a circle moved from x=100.0 to x=100.4 changed **0 pixels**, while skia changed 496. A 0.4 px-per-frame drift is exactly the micro-motion this workflow uses to keep a scene alive, so on PIL alone it renders as a still frame — and the encoder sees a freeze (§7). Either draw the drift in skia, or supersample at 2× so half-pixel steps exist.
 - Simulate motion blur by averaging several sub-frames at slightly different times.
 - Render in parallel with resume: because frames are deterministic, draw with several workers (`multiprocessing`, 4–8 processes) and skip frames whose PNG already exists and is non-empty. If a render dies, rerun the same script — only missing frames are redrawn.
 
@@ -699,16 +743,14 @@ def check(ok, msg):
 print("\n".join(findings) if findings else "no findings")
 ```
 
-How to capture drawn text, by pipeline:
+How to capture drawn text. Text is always drawn by PIL in this pipeline, so the capture point is one wrapper:
 
-| Pipeline | Capture text | Capture frames |
+| What was drawn | Capture text | Capture frames |
 |---|---|---|
-| Python/PIL | wrap the text-drawing method | call the render function directly |
-| HTML/Playwright | `page.evaluate` enumerating text elements' `innerText` | screenshot per `t` |
-| Remotion/Node | collect from `useCurrentFrame` → record elements in components | `renderStill` per `t` |
-| Canvas/JS | wrap `ctx.fillText` | `toDataURL` per `t` |
+| PIL `ImageDraw.text` | wrap the method: `orig = ImageDraw.ImageDraw.text; def patched(self, xy, s, *a, **kw): seen.append((s, xy)); return orig(self, xy, s, *a, **kw)` | call the frame function directly |
+| PIL `ImageFont.getbbox` | use it for the measured box; it does not draw | — |
 
-If a pipeline cannot record which text was drawn, the sync gate cannot run — in that case verify timing from the **time table** the renderer uses (find values satisfying `text_time >= word_time`) and tell the user the check was table-based, not pixel-based.
+If a scene draws text through skia instead of PIL (it should not — skia cannot shape script), that text is invisible to the gate. Keep text in PIL and the gate stays complete. When no capture is possible, verify timing from the **time table** the renderer uses (find values satisfying `text_time >= word_time`) and tell the user the check was table-based, not pixel-based.
 
 **Sync gate.** For each key text prove two things: it exists at `word_time + 0.10` and does not exist at `word_time − 0.15` (the window is tunable; what matters is its asymmetry — 0.1 s late beats appearing early). Capture all drawn text by wrapping the text call, then match by text name.
 
@@ -716,12 +758,12 @@ ASR times are **voiceover time**; the renderer draws on **video time**. Add `vo_
 
 ```python
 seen = []
-orig = Cam.text
-def patched(self, x, y, s, size, fill, **kw):
-    if kw.get("alpha", 255) > 40 and size > 20:
+orig = ImageDraw.ImageDraw.text                      # the real PIL method, not a wrapper class
+def patched(self, xy, s, *a, **kw):
+    if kw.get("fill") is not None and not kw.get("_skip"):
         seen.append(str(s))
-    return orig(self, x, y, s, size, fill, **kw)
-Cam.text = patched
+    return orig(self, xy, s, *a, **kw)
+ImageDraw.ImageDraw.text = patched
 
 def at(t):
     seen.clear(); render_frame(int(round(t * 30))); return list(dict.fromkeys(seen))
@@ -889,9 +931,12 @@ Use at most a few per video, always below the voiceover level, and tell the user
 ## 9. Common traps
 
 - **VFR (variable frame rate):** force CFR with `-r 30`. Verify `r_frame_rate` and `avg_frame_rate` both read 30/1.
+- **cairosvg drops effects with no error.** Measured on 2.9.1: `feGaussianBlur stdDeviation=6` produced **one** unique value down the blurred column, and a `#808080` mask rendered **255** (fully opaque). A scene built on SVG filters ships flat and nothing reports it. Do not add cairosvg back — use skia for blur, mask and gradient.
+- **skia `drawString` does not shape script.** Measured: `مرحبا بالعالم` renders **439 px** wide against **307 px** from PIL with `layout_engine=ImageFont.Layout.RAQM` — isolated letters, not joined. Draw text with PIL always; skia draws shapes only.
+- **4× supersampling costs 85 minutes, not 5.** Measured at 1080×1920 with six shapes: 564 ms/frame at 4×, 186 ms at 2×, 34 ms with skia. If skia is missing, supersample at 2× — glyphs are already antialiased by FreeType, so the extra factor buys almost nothing.
 - **Duration off by a frame:** usually the drawn frame count differs from `DUR × 30`. Recount before encoding.
 - **Audio longer than video** (or the reverse): use `apad=whole_dur=$DUR` and `atrim=0:$DUR` as in the example, plus `-t $DUR`.
-- **Font not found:** check `fc-list`, or download through `npm` — never silently fall back to an ugly default.
+- **Font not found:** check `fc-list`, or download it through the recipe in §1 — never silently fall back to an ugly default.
 - **Indonesian text clipped at the edge:** measure width with the font's own measuring function, never by eye.
 - **File very large:** raise CRF (e.g. 20–22); never lower the resolution.
 - **`alimiter` installed yet `max_volume` stays 0 dB:** alimiter's default `level` is 1 (auto-level) — after limiting, the signal is normalised BACK to 0 dBFS. Use `alimiter=limit=0.85:level=0`. Measured: `limit=0.79` alone still yields max 0.0 dB; with `level=0` it yields −1.3 dB.
@@ -927,7 +972,7 @@ Use at most a few per video, always below the voiceover level, and tell the user
 | Path | Why it must survive |
 |---|---|
 | `script.txt` | the narration source; re-generating TTS or re-cutting the script starts here |
-| `render.<ext>` | the whole visual design lives in this one file |
+| `render.py` | the whole visual design lives in this one file |
 | `audio/voiceover.wav` | timing source; re-running ASR or re-mixing needs it |
 | `audio/words.json` | **the only non-reproducible derived file** — re-running ASR returns ±0.1 s different timestamps and desyncs a re-render |
 | `audio/music.wav` | re-mix without regenerating music |
@@ -942,7 +987,7 @@ Before deleting, confirm the required checks passed — duration, frame count, l
 
 ```bash
 # every input the build script reads must still exist
-grep -oE '(audio|assets|output)/[A-Za-z0-9_.-]+' render.<ext> | sort -u | while read p; do
+grep -oE '(audio|assets|output)/[A-Za-z0-9_.-]+' render.py | sort -u | while read p; do
   [ -e "$p" ] || echo "MISSING for re-render: $p"
 done
 ```

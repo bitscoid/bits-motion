@@ -42,9 +42,10 @@ Longer only when you ask. Orientation is chosen in stage 1, before the script is
 git clone https://github.com/bitscoid/bits-motion.git \
   ~/.config/opencode/skills/bits-motion
 
-# 2. check the toolchain (ffmpeg, ffprobe, PIL, numpy)
+# 2. check the toolchain (ffmpeg, ffprobe, PIL, numpy; skia recommended)
 ffmpeg -version | head -1
 python3 -c "import PIL, numpy; print('PIL+numpy ok')"
+python3 -c "import skia; print('skia', skia.__version__)" 2>/dev/null || echo "skia: absent"
 
 # 3. ask for a video
 "buatkan motion graphic tentang kenapa kopi bikin ngantuk"
@@ -172,7 +173,7 @@ tiga-mitos-otak/
 
 `audio/words.json` sits outside `work/` deliberately: it is the only derived file a revision cannot faithfully recreate (a fresh ASR pass returns ~±0.1 s different timestamps and desyncs a re-render). Everything else in `work/` rebuilds in one command, so `rm -rf work` loses nothing that matters.
 
-`render.py` is the Python pipeline's name; the build script is always a single entry point, `render.<ext>`.
+`render.py` is the build script and the only entry point — Python only, no Node step.
 **Naming rule:** file and directory names are English kebab-case; file contents and every message to the user are Indonesian. The project folder and the video carry the topic slug so they stay meaningful in a file manager.
 
 `rm -rf work` then re-render restores the whole video.
@@ -185,11 +186,14 @@ tiga-mitos-otak/
 |---|---|
 | `ffmpeg` + `ffprobe` | rendering, measuring, verification |
 | `python3` + PIL + numpy | frame generation and asset measurement |
+| `skia-python` | **strongly recommended** — antialiased shapes, gradients, blur. Without it, shapes are hard-edged and you must supersample at 2× (186 ms/frame vs 34 ms) |
 | `faster-whisper` | word-level timing (optional, degrades to estimate) |
 | `GEMINI_API_KEY` | optional TTS when you have no recording (Interactions endpoint) |
 | `yt-dlp` | optional, downloading style references |
 
 Verified on ffmpeg 7.1. Every ffmpeg behaviour cited in the docs was measured on a real render, not copied from documentation.
+
+Text is drawn with PIL (FreeType antialiasing, RAQM shaping for Arabic/Indic/Thai); shapes are drawn with skia when it is present. Drawing everything at 4× and downscaling instead costs 564 ms/frame — 85 minutes for a 300-second video.
 
 Disk and time scale with the cap: a 300 s landscape video is **9000 PNG frames** before encoding. Render with the resume worker and expect the encode to take minutes, not seconds.
 

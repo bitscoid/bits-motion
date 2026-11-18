@@ -16,7 +16,7 @@ Read this before building any scene. It covers execution — typography, asset a
 
 A reference is a floor, not a mould. What transfers is the principle — why the video feels good, not the order of its effects.
 
-Read eight layers — palette, typography, composition, graphic language, motion, rhythm, sound, attention architecture — with the concrete prompts and the four-step read in `RENDER.md` §4. Two of those layers exist only in time: **motion** (easing, entry duration, text granularity) and **rhythm** (cut distribution, event density). A contact sheet cannot show either; read them from motion strips. Write the result as a ten-line brief in the header of `render.<ext>`, so the read survives to the last scene.
+Read eight layers — palette, typography, composition, graphic language, motion, rhythm, sound, attention architecture — with the concrete prompts and the four-step read in `RENDER.md` §4. Two of those layers exist only in time: **motion** (easing, entry duration, text granularity) and **rhythm** (cut distribution, event density). A contact sheet cannot show either; read them from motion strips. Write the result as a ten-line brief in the header of `render.py`, so the read survives to the last scene.
 
 Take at least one measured number per layer where a number exists — a size ratio, a cut interval, a stroke weight — because an adjective cannot be built.
 

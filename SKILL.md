@@ -123,9 +123,9 @@ tiga-mitos-otak/
     └── music-norm.wav      looped + ducked-ready music (when music exists)
 ```
 
-**`audio/words.json` is outside `work/` on purpose.** It is the only derived file a revision cannot cheaply recreate: re-running ASR after a cleanup returns timestamps that differ by ~±0.1 s from the ones the pictures were synced to, so a re-render would drift. Keeping it in `audio/` makes `rm -rf work` lose nothing that matters, and `render.<ext>` reads it from there. Everything else in `work/` is either an input (`audio/`, `assets/`) or rebuildable in one command.
+**`audio/words.json` is outside `work/` on purpose.** It is the only derived file a revision cannot cheaply recreate: re-running ASR after a cleanup returns timestamps that differ by ~±0.1 s from the ones the pictures were synced to, so a re-render would drift. Keeping it in `audio/` makes `rm -rf work` lose nothing that matters, and `render.py` reads it from there. Everything else in `work/` is either an input (`audio/`, `assets/`) or rebuildable in one command.
 
-`render.py` is the Python pipeline's name. The build script is always one entry point, `render.<ext>` — `render.mjs` for Remotion, `render.ts` for a Node/Playwright project. Never two entry points. Helper modules are fine (`lib/`, `make_music.py`) as long as `render.<ext>` is the only thing you run end to end.
+`render.py` is the build script and the only entry point — one file, one language. Never a second entry point. Helper modules are fine (`lib/`, `make_music.py`) as long as `render.py` is the only thing you run end to end.
 
 Never create empty directories. No images means no `assets/`. No music means no `audio/music.wav`.
 
@@ -135,7 +135,7 @@ Never create empty directories. No images means no `assets/`. No music means no 
 |---|---|---|
 | Directories | one lowercase English word | `audio`, `assets`, `output`, `work`, `frames`, `check` |
 | Data files | English kebab-case | `script.txt`, `voiceover.wav`, `words.json`, `publish.txt` |
-| Build script | snake_case + extension of the pipeline | `render.py`, `render.mjs`, `make_music.py` |
+| Build script | snake_case, one entry point | `render.py`, `make_music.py` |
 | Project folder | topic slug, kebab-case | `tiga-mitos-otak` |
 | Deliverable | topic slug | `output/tiga-mitos-otak.mp4` |
 | File contents | Indonesian | script, comments, reports |
@@ -165,9 +165,9 @@ If two candidates could both be the voiceover, or a file's role stays unclear af
 
 ### What this workflow does not create
 
-`project.json`, `timing.json`, `scenes.py`, `manifest.json`, `style.json`, `review/`, or a separate QC report. Creative decisions (font, voice, palette) are agreed with the user and live in `render.<ext>`; check results are reported directly in the delivery message. Three exceptions, because they are data and not reports: `audio/words.json` (word timings), the optional `output/<slug>.srt`, and `output/publish.txt` (platform upload copy).
+`project.json`, `timing.json`, `scenes.py`, `manifest.json`, `style.json`, `review/`, or a separate QC report. Creative decisions (font, voice, palette) are agreed with the user and live in `render.py`; check results are reported directly in the delivery message. Three exceptions, because they are data and not reports: `audio/words.json` (word timings), the optional `output/<slug>.srt`, and `output/publish.txt` (platform upload copy).
 
-Tool configuration a pipeline genuinely needs — `package.json`, `tsconfig.json`, `.npmrc`, `node_modules/` — is not a project document: create it when the chosen pipeline requires it. The ban is on parallel sources of truth, not on the toolchain.
+Tool configuration a Python pipeline needs — `requirements.txt`, `pyproject.toml`, `.venv/` — is not a project document: create it when the environment requires it. The ban is on parallel sources of truth. This pipeline has no Node step, so `package.json`, `tsconfig.json` and `node_modules/` never appear.
 
 ### Starting behaviour
 
@@ -341,7 +341,7 @@ Pilihannya:
    ```
 
    Write the result to `audio/words.json` either way (`references/RENDER.md` §3) — not `work/`, because it is the one derived file a later revision cannot faithfully recreate. Every later stage reads it: the timeline, the sync gate, and the optional subtitle and publish files.
-4. With a reference video, run the four-step read in `references/RENDER.md` §4 — contact sheet, motion strips, eight layers (palette, typography, composition, graphic language, motion, rhythm, sound, attention architecture), then the brief — plus the signature device and the reference's weakness. Measure cut rhythm instead of describing it from impression, and read motion from the strips, never from stills. The contact sheet and the strips are image calls — see *Vision routing*, batched into one delegated call if the main model cannot see them. The ten-line style brief from that read goes into the header of `render.<ext>` before the first scene (stage 6); it is the build's contract from the first frame to the last. The reference is a floor, not a ceiling, so at least one decision must come from the topic. Never copy shots, text placement, or animation order.
+4. With a reference video, run the four-step read in `references/RENDER.md` §4 — contact sheet, motion strips, eight layers (palette, typography, composition, graphic language, motion, rhythm, sound, attention architecture), then the brief — plus the signature device and the reference's weakness. Measure cut rhythm instead of describing it from impression, and read motion from the strips, never from stills. The contact sheet and the strips are image calls — see *Vision routing*, batched into one delegated call if the main model cannot see them. The ten-line style brief from that read goes into the header of `render.py` before the first scene (stage 6); it is the build's contract from the first frame to the last. The reference is a floor, not a ceiling, so at least one decision must come from the topic. Never copy shots, text placement, or animation order.
 
    Report what you found and what you will take, in Indonesian:
 
@@ -410,7 +410,7 @@ Vary the rhythm: an opening that grabs, a dynamic middle, a closing that satisfi
 
 Read both reference documents before building anything:
 - `references/GUIDE.md` — creative direction, typography, asset animation, transitions, **translating ideas into visuals (§5), cross-scene variation (§6)**, audio mixing.
-- `references/RENDER.md` — environment check, fonts, render pipeline, ffmpeg commands, verification.
+- `references/RENDER.md` — environment check, fonts, the render pipeline (PIL for text, skia for shapes), ffmpeg commands, verification.
 
 **Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier cap height, WCAG contrast, text collision (coverage), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against your renderer's data structures. Do not look for a shared library; every project has its own shapes.
 
@@ -424,7 +424,7 @@ Before writing scene code, give every core point one visual mechanism that can b
 
 Inspect the exported MP4 from start to finish, not just the timeline editor:
 
-1. Style is inspired by the reference without copying it shot for shot — checked against the style brief in the header of `render.<ext>`: every line still holds, the signature device is present, and at least one decision came from the topic rather than the reference.
+1. Style is inspired by the reference without copying it shot for shot — checked against the style brief in the header of `render.py`: every line still holds, the signature device is present, and at least one decision came from the topic rather than the reference.
 2. Text is legible, correctly spelled, and synced to the narration. Captions and footnotes sit inside the safe area and are never mistaken for words the narration says (`references/GUIDE.md` §2 is guidance, not a gate).
 3. Assets appear at relevant moments, uncropped and undistorted.
 4. Transitions are smooth, varied, and purposeful.
