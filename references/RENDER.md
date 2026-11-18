@@ -359,9 +359,10 @@ bb = d.textbbox((px, py), s, font=f, anchor=anchor)
 assert bb[0] > W * 0.04 and bb[2] < W * 0.96
 assert bb[1] > H * 0.04 and bb[3] < H * 0.96
 
-# 1b) keterbacaan: tinggi glyph >= 4% tinggi frame. Kalau gagal, naikkan ukuran font
-#     atau pendekkan barisnya -- jangan diamkan.
-assert (bb[3] - bb[1]) >= H * 0.04, f"teks terlalu kecil: {s}"
+# 1b) keterbacaan: tinggi GLYPH, bukan ukuran font (glyph kapital ~0,75x font).
+#     dua tingkat sesuai GUIDE.md §2: utama >=4%H, pendukung >=2.5%H
+gh = bb[3] - bb[1]
+assert gh >= H * (0.04 if is_main else 0.025), f"teks terlalu kecil: {s} ({gh}px)"
 
 # 2) tabrakan antar teks: IoU kotak glyph
 def iou(a, b):

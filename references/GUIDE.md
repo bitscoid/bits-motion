@@ -33,7 +33,11 @@ Aturan:
 - Pisahkan jelas tingkatan: judul, kata kunci, teks pendukung, label kecil.
 - Hindari huruf besar acak, font yang sulit dibaca, dan dekorasi berlebihan.
 - Jaga safe area: elemen penting minimal ±4% dari tepi frame. Angka ini satu-satunya angka (gerbang geometri di `RENDER.md` §7 memakai 4%); jangan pakai nilai lain supaya tidak ada dua kebenaran.
-- Ukuran teks terkecil tetap terbaca di resolusi output: minimal sekitar 4% dari tinggi frame (1080p ≈ 43 px).
+- Ukuran teks terkecil tetap terbaca di resolusi output. **Ambangnya tinggi glyph, bukan ukuran font** — glyph kapital hanya sekitar 0,75× ukuran font, jadi `truetype(size=100)` menghasilkan glyph ±75 px. Ukur dengan `textbbox`, jangan dari angka `size`. Dua tingkat:
+  - **teks utama / kata kunci**: tinggi glyph ≥ 4% tinggi frame (1920 → 77 px; berarti font ≈ 102 px).
+  - **teks pendukung / label / chip kecil**: tinggi glyph ≥ 2,5% tinggi frame (1920 → 48 px; font ≈ 64 px), dan wajib lolos kontras 4,5:1 karena ukurannya kecil.
+
+  Kalau baris pendukung tidak muat di tingkat 2,5% bersama elemen lain, kurangi jumlah kata di baris itu — jangan turunkan ambangnya.
 - Cek kontras teks vs latarnya di kode, jangan dikira dari nama warna. Ambangnya terukur: rasio kontras minimal **4,5:1** untuk teks kecil dan **3:1** untuk teks besar (≥24 px tebal atau ≥32 px biasa). Hitung dengan rumus WCAG:
 
 ```python
