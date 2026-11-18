@@ -29,7 +29,7 @@ Typography is a storytelling element, not a subtitle layer.
 Techniques, chosen by context: text appearing with the spoken word, mask reveals, staged word or letter reveals, controlled overshoot scaling, letter-spacing animation, text emerging from behind objects, creative clipping and layering, emphasis through weight, colour, or size.
 
 Rules:
-- Choose fonts that are modern, heavy, and highly legible. Use real fonts through code (never text rendered by an image generator) so letters never break or turn into fake words.
+- Choose fonts for **legibility first; weight and register follow the topic**. Modern-and-heavy is a common default, not a rule — an elegant serif for an editorial topic, a condensed archival face for history, or a script accent for a personal topic are equally legitimate when the topic calls for them. The real constraint: use real fonts through code (never text rendered by an image generator) so letters never break or turn into fake words.
 
   **The font catalogue is not a menu.** The list in `RENDER.md` §"Fonts ready to use" is what happens to be installed, not the set of allowed choices. Your job is to pick typography that **fits the topic and the reference mood**, not the first row of the table. If the topic needs something missing (a food topic wanting a fat slab serif, an archive topic wanting a heavy condensed face, a tech topic wanting a narrow grotesk), **download it** — never settle for "close enough" just because it's installed. The download recipe and verification are in `RENDER.md` §1.
 
@@ -41,7 +41,11 @@ Rules:
   - **uppercase in the supporting sans, tracked 4–8 px**, when the line is short (a label, an index, a chip, a one- to three-word caption); or
   - **the display face, usually italic**, when the caption reads as a phrase or a sentence rather than a bare label.
 
-  The trap is a single sentence-case sans line left alone among caps labels. It stops reading as part of the design and starts reading as a tooltip or a settings note — the interface voice of the face showing through, which is exactly what makes a frame look like a template.
+  The trap is a single sentence-case sans line left alone among caps labels. It stops reading as part of the design and starts reading as a tooltip or a settings note — the interface voice of the face showing through, which is exactly what makes a frame look like a template. The same trap in its weaker form: small supporting labels set in a plain sans at regular weight read as standard-issue UI text (measured against a real build, revised: every meta label moved to a characterful face). The fix that held up in practice — **one two-family system for the whole video**, where the meta face is chosen **by topic register**:
+  - **display face** for everything spoken-content and emphatic (titles, claims, keywords, stamps, verdict badges);
+  - **a characterful meta face**, uppercase + tracked 4–8 px, for *every* meta label, chip, caption, index and footnote — a mono (e.g. `JetBrains Mono`) carries the right technical register for tech and data topics; an editorial or historical topic may want a serif italic or small-caps serif instead. The constant is that all meta-copy shares ONE distinctive voice — which face carries it is a per-topic decision;
+  - quoted claims stay sentence case even in the display face (never uppercase a claim), and digits/counters live in the meta face as data.
+  Two families total: display + meta voice. A third sans between them is the "standard and lowercase" mush this rule exists to kill. And the system itself must not harden into a template — mono everywhere is what this rule becomes if nobody re-asks "does a mono fit *this* topic?".
 - **Do not police case anywhere else.** Spoken content — a claim, a quote, a sentence the narration also says — keeps its natural case and punctuation in whatever face it uses, and a project may deliberately set content lines in sentence-case sans as its "plain voice". The rule above is about meta-copy, not about banning lowercase.
 - **Never uppercase a quoted claim or a proper noun**, even where a label would fit: caps make the frame look like it endorses those words as its own headline. A myth, a quote or a reported claim stays sentence case.
 - **Caps without tracking read as a form, not a label.** Add the tracking, keep the line short, and measure the **cap height** (not the ascender box) against the size tier — uppercase lines are uniform height, so the size that clears 2.5% for mixed case will usually not clear it in caps.
@@ -109,10 +113,11 @@ d.text((px - dx, py - dy), s, font=f, anchor="mm", fill=fill)
 
   Measured: offset 10 px → 0.5 px. If a camera transform is active (scale/shift), divide `dx` and `dy` by the scale before applying. If the text uses per-letter `spacing`, `anchor` no longer applies — measure total width and centre it manually; never mix the two methods.
 - **Text stacks are measured, not assumed.** When several lines stack vertically (label, title, subtitle), compute each line's top/bottom from `textbbox` and confirm there is no intersection. Reading order must match narrative order, and the last line must not crowd the object below it — leave at least ~0.8× line height.
+- **Chips and badges are centred by construction, not by eye.** Measure the content first (icon width + gap + text width at the real font), then build the box around the group: `left = centre − content/2`, box = `[left − pad, y − h/2, left + content + pad, y + h/2]`. Placing the box and the text independently measured tens of pixels off-centre and a badge that swallowed the icon. And when a diagram line must pass near text, the text moves — a stroke drawn through a label band (a cable crossing a centred caption) measured twice before this rule existed.
 
 ## 3. Animating assets
 
-Important assets must not sit still unless there is a deliberate beat of rest. This is a requirement, not an option: every scene keeps at least one element moving at all times; if nothing would naturally move, use micro camera motion (slow zoom drift or a gentle pan across the scene). A motion graphic that is static in any scene fails QC (the freezedetect gate is in `RENDER.md` §7).
+Assets must not sit still *by accident*. When a scene would be still, first ask whether stillness is the right choice here — a held frame after a verdict can land harder than motion. If stillness is intentional, write it in the timeline and keep it brief; if not, add micro camera motion (slow zoom drift or a gentle pan). What fails QC is an *undocumented* static scene (`RENDER.md` §7): motion is the default, stillness is a decision.
 
 The lower bound is not taste, it is the encoder: motion that is too small (radius <15 px, shift <10 px) can be quantised away at CRF 18+, leaving identical frames. Measure the motion; don't assume.
 
@@ -164,7 +169,7 @@ Before building scenes, give each core point one **visual mechanism**, not just 
 | Cycle | "how does it repeat?" | a rotating loop, the same day recurring |
 
 Working rules:
-- One main mechanism per scene. Two at once weaken each other.
+- Default to one dominant mechanism per scene — but this is a default, not a ceiling. Layering two mechanisms works when one is clearly subordinate to the other (a cycle that also accumulates, a split that also transforms); what weakens a scene is two mechanisms *competing at equal weight*. Decide deliberately, either way.
 - Borrowing visual idioms (bar chart, clock, stack) is fine, but never let them stay generic icons with no meaning specific to this topic.
 - If an idea cannot be drawn without text, the idea isn't visual yet — change the mechanism instead of adding words.
 - A mechanism may recur as a motif across scenes (accumulation used twice) as long as its form evolves.

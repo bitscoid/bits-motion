@@ -273,13 +273,21 @@ The table above is for your own reference. What reaches the user is the Indonesi
   ```
 
   Then probe it. If it fails (region block, removed pin, no video stream, under 5 s, or under the planned resolution), say so once and fall back to the search path below — never silently drop the style anchor.
-- **The user declines to supply a reference, or asks for everything automatic:** search Pinterest yourself, in this order:
-  1. Search with the topic's keywords plus `motion graphics` — e.g. `pinterest.com pin <topic keywords> motion graphics video`. Collect 3–5 candidate pins.
-  2. Judge fit: does the palette, typography, and motion feel match the topic's character? Pick the closest.
-  3. If nothing matches the topic, pick one that is *roughly* related — same broad mood (calm/serious/energetic), same kind of subject matter.
-  4. If even that fails, stop searching and design the style yourself: choose palette, typography, and motion language from the topic. State the choice in one line so the user can object.
+- **The user declines to supply a reference, or asks for everything automatic:** searching Pinterest yourself is **mandatory before self-design** — never jump straight to designing your own style. The search path failed in a measured run (2026-11) only after 8 candidates; that is the budget to beat. Work in this order:
 
-  Whatever you pick, tell the user which reference you used — URL plus a one-line reason — before analysing it. A self-chosen style is legitimate; an unannounced one is not.
+  1. **Search.** Use the Pinterest search URL directly or a web search, keywords = `motion graphics` + the topic's own words:
+     - `https://id.pinterest.com/search/pins/?rs=typed&q=motion+graphics+<topik>` (or `pinterest.com pin <topic keywords> motion graphics video` through a web search)
+     - try Indonesian AND English keywords; collect 5+ candidate pin URLs before downloading anything.
+  2. **Download one at a time** until one passes the filter: `yt-dlp "<pin-url>" -o "assets/reference.mp4"`.
+  3. **Filter with `ffprobe`** and discard: under 5 s, over 90 s, below planned resolution, no video stream. Discarded → next candidate.
+  4. **Measured failure modes (do not read them as "Pinterest is down"):**
+     - many pins are images with a video thumbnail → yt-dlp exits `No video formats found!` → skip, next pin;
+     - pins that embed Vimeo can fail with `Unable to extract info section` or an SSL `Hostname mismatch` for `vimeo.com` — some environments TLS-block Vimeo; try the direct `vimeo.com/<id>` URL once, then skip the whole domain;
+     - a successful download may still be a 4 s loop → discarded by the 5 s filter.
+     Budget: **at least 5 pin candidates across at least 2 different searches** before declaring the search exhausted. Report to the user how many were tried and why each failed — one line each is enough.
+  5. If the budget is exhausted with no usable file, stop searching and design the style yourself: choose palette, typography, and motion language from the topic. State the choice in one line so the user can object — and state that the search was attempted and what it hit.
+
+  Whatever you pick, tell the user which reference you used — URL plus a one-line reason — before analysing it. A self-chosen style is legitimate; an unannounced or unattempted search is not.
 - **An important file will not open or is corrupt:** tell the user. Never pretend it was processed.
 
   ```

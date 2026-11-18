@@ -334,9 +334,11 @@ For a URL from the user, download with `yt-dlp "<url>" -o "assets/reference.mp4"
 
 ### Finding a reference on Pinterest (when the user gives none)
 
-If the user supplies no reference file or URL (or asks for everything automatic), search in this order — do not stop at the first failure:
+If the user supplies no reference file or URL (or asks for everything automatic), searching is **mandatory before self-design** — the budget and failure modes are specified in `SKILL.md` stage 3 and apply here verbatim: ≥5 pin candidates across ≥2 searches, one download attempt at a time, discard by the filter below, report each failure in one line. Known failure modes measured in the wild: image-only pins (`No video formats found!`), Vimeo-embedded pins (often TLS-blocked per environment), and 4 s loops that fail the minimum-duration filter. Only after the budget is exhausted: design the style yourself and say so, including that the search was attempted.
 
-1. **Search with `motion graphics` plus the topic.** Queries like `pinterest.com pin <topic keywords> motion graphics video` (try Indonesian and English). Collect 3–5 candidate video pins.
+Search in this order — do not stop at the first failure:
+
+1. **Search with `motion graphics` plus the topic**, e.g. `https://id.pinterest.com/search/pins/?rs=typed&q=motion+graphics+<topik>` (or `pinterest.com pin <topic keywords> motion graphics video` through a web search; Indonesian and English). Collect 5+ candidate pin URLs before downloading.
 2. **Judge fit, not just relevance.** Compare each candidate against the topic's character: is the palette right for this subject? Is the typography at the right register (serious, playful, archival, technical)? Is the motion pace suited to the narration? Pick the closest.
 3. **If nothing fits well, take something loosely related** — same broad mood or same kind of subject matter, even if the content differs. A calm paper-craft pin is a better style anchor for a serious topic than an energetic neon clip that happens to share keywords.
 4. **If even that fails, design the style yourself.** Choose palette, typography, and motion language from the topic and say so in one line, e.g. `Tidak ada acuan yang cocok, jadi saya tentukan sendiri: latar gelap, aksen hangat, tipografi tebal.` A self-designed style is legitimate; an unannounced one is not.
@@ -520,14 +522,14 @@ ffmpeg -i output/<slug>.mp4 -af volumedetect -vn -f null - 2>&1 | grep -E "mean_
 
 **Motion gate:** `freezedetect=n=0:d=1.0` must come back empty, except for deliberate, timeline-documented rests. A freeze means the render is genuinely still — go back to §5, add micro camera motion or element animation, re-render. Report this gate result alongside the duration.
 
-How many rests are allowed scales with length, because a five-minute explainer needs breathing room a 60-second clip does not. The gate is measurable either way — it just counts longer videos differently:
+How many rests are expected scales with length, because a five-minute explainer needs breathing room a 60-second clip does not. Treat the table as an **alert threshold, not a ceiling**: a deliberate hold — comedic timing, a punchline frame, a dramatic pause after a verdict — is a legitimate editing choice when it is written in the timeline with its reason. The gate's job is to count rests and list their positions so a human judges intent; it must never fail a video for holding a frame on purpose. What stays forbidden is the *undocumented* freeze: a scene stalled because nothing was animated.
 
-| Runtime | Allowed rests | Each |
+| Runtime | Expected rests (alert above this) | Each |
 |---|---|---|
-| ≤60 s | 1 | ≤1.5 s |
+| ≤60 s | ~1 | ≤1.5 s |
 | >60 s | ≤1 per full minute of runtime | ≤2.5 s |
 
-Where they go is your call. A rest is a beat of calm after a point lands, never a stalled scene in the middle of an explanation, and every rest is written in the timeline with its reason — the gate stays a gate, it just knows the video is longer now.
+Deliberate holds beyond the threshold are fine when each one is written in the timeline ("hold 1.8 s on the 100% frame for comic timing"). Undocumented freezes are defects. The difference is the timeline entry, not the number.
 
 The lead-in is not covered by this gate: the first `VO_DELAY` (1 s) holds the title/accent and is allowed to sit still, because nothing is being narrated yet. A freeze reported **entirely** inside `0..1 s` is not a defect; a freeze that reaches into speech is.
 
@@ -769,6 +771,12 @@ Use at most a few per video, always below the voiceover level, and tell the user
 - **`tile` without `-frames:v 1`** writes the grid once per input frame and fails on the second (`Cannot write more than one file with the same name`, exit −22). Also make sure the tile grid has room: a fixed `8x8` at `fps=1` covers only 64 s, so a 300 s landscape video shows its first minute and silently drops the other four. Size interval and grid from `DUR` (§7).
 - **Missing frames mid-sequence truncate the encode:** `-i work/frames/%05d.png` stops at the first gap, and `-pattern_type glob` reorders but does not fill. Measured: a 5-file sequence with `00002.png` missing encoded 2 frames. Assert contiguity before encoding (§6).
 - **SRT timestamps from float seconds misformat:** `int(round((s % 1) * 1000))` yields `",1000"` for 1.9996 s, which players reject. Convert to integer milliseconds first, then `divmod` (recipe in §3).
+- **`textbbox` with `anchor="mm"` at the origin returns HALF widths:** `bbox[2]` is the right edge measured from a centred origin, so using it as a word's width makes every following word overlap the previous one (measured: adjacent words scored 0.43–1.00 coverage and read as double-printed). Always take `b[2] - b[0]` for advances, totals, and tracking — per character as well.
+- **Missing glyphs render as tofu, not as nothing:** the ⚡ character does not exist in Archivo Black and rendered as a placeholder box mid-video (measured on an otherwise passing gate run — the pixel gates do not catch it). Draw symbols (lightning, arrows, badges) as polygons/paths in code; never put emoji or symbol codepoints through a display font.
+- **Decorations must never cross a text band:** a charging cable drawn straight through a centred label, and a connector plug landing on a chip, both measured. When a diagram needs a line where text sits, move the label (e.g. split it into two left-anchored lines beside the line's axis), never layer text over the stroke.
+- **Chips and badges: build the box from the measured content, not the reverse:** box = padding + icon + gap + text width, the whole group centred on its anchor. Hand-placing the box and the text separately measured off-centre by tens of pixels. Also: a keyword inside a chip is a *badge*, not primary text — set it in the supporting tier (≥2.5% glyph height), not the primary tier, or it dwarfs the card around it.
+- **ASR homographs break keyword lookup:** matching the word `jadi` by first occurrence grabbed an earlier sentence's token (and an empty ASR artifact split one word into two), silently collapsing a scene range and leaving an 11-second stretch drawing only the closing scene — which no pixel gate flagged as wrong. Index repeated words from the END (`occ=-1`) for closings/verdicts, and after building the timeline, assert scene ranges are increasing (`a < b` for every consecutive pair).
+- **Word-level width math is the collision gate's blind spot's twin:** the geometry gate only fires on the frames you sample. Run the coverage check on frames at *every* sentence midpoint, not just the sync-check moments, or an overlap that appears only while words are mid-pop stays invisible.
 - **Small idle elements quantised by the encoder:** dots/particles under ~15 px radius that merely pulse in a large flat area can vanish after encoding (CRF 18+), leaving identical decoded frames → a real freeze in the MP4 even though the renderer drew motion. Enlarge the element and move its position, not just its radius (a solid antialias-free circle changing radius often alters no pixel at all).
 
 ## 10. Cleanup after delivery
