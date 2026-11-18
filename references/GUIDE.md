@@ -192,8 +192,6 @@ A video with a dozen or more scenes slides easily into "same layout, different w
 - **Vary scale**: one scene with an oversized element bleeding off-frame makes the rest feel airy even at normal size.
 - **Hold one thing constant** — an accent, a display face, a dominant motion type. That constant is what makes the variation feel intentional rather than random.
 
-Check the result with a contact sheet (`ffmpeg ... tile`) before export: if every thumbnail follows the same pattern, variation is insufficient. A model without vision delegates that look to the `vision` subagent — one call, then judge from the returned description.
-
 **Make the check quantitative.** Rate each scene on four axes and keep the vector beside the timeline; three consecutive scenes on the same vector is the flag, not two.
 
 ```python
