@@ -185,15 +185,14 @@ tiga-mitos-otak/
 | Need | Why |
 |---|---|
 | `ffmpeg` + `ffprobe` | rendering, measuring, verification |
-| `python3` + PIL + numpy | text, images, frame generation and asset measurement |
-| `skia-python` | **required** — antialiased shapes, gradients, blur, sub-pixel motion |
+| `python3` + PIL + numpy + skia | text, images, shapes, frame generation and asset measurement |
 | `faster-whisper` | word-level timing (optional, degrades to estimate) |
 | `GEMINI_API_KEY` | optional TTS when you have no recording (Interactions endpoint) |
 | `yt-dlp` | optional, downloading style references |
 
 Verified on ffmpeg 7.1. Every ffmpeg behaviour cited in the docs was measured on a real render, not copied from documentation.
 
-Text is drawn with PIL (FreeType antialiasing, RAQM shaping for Arabic/Indic/Thai); shapes are drawn with skia.
+Text is drawn with PIL; shapes are drawn with skia.
 
 Disk and time scale with the cap: a 300 s landscape video is **9000 PNG frames** before encoding. Render with the resume worker and expect the encode to take minutes, not seconds.
 

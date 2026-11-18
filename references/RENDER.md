@@ -80,8 +80,6 @@ Match to the video's mood; **2–3 families is the usual range** (one display + 
 
 Mix across categories freely. **2–3 families is the range that usually reads as one system**; more rarely does, but a concept that needs a fourth voice is a decision to make, not a rule breaking. The catalogue exists to widen the range of moods available, not to prescribe which one to pick.
 
-For a script the catalogue does not cover (Arabic, Devanagari, CJK, Thai), download a family that supports it and verify **shaping**, not just glyph presence. PIL needs a Raqm-enabled build for correct Arabic and Indic joining (`ImageFont.Layout.RAQM`), and a font that only renders isolated forms ships broken text. Test a real sentence from the script before building a scene around it.
-
 Usage: in PIL pass the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`). Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file; call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
 
 ### Adding a new font
@@ -143,21 +141,7 @@ Python draws every frame deterministically from `t = frame_index / 30`, then ffm
 pip install pillow numpy skia-python
 ```
 
-### Two rasterisers, one file
-
-| Rasteriser | Draws | Measured, 1080×1920 | Use it for |
-|---|---|---|---|
-| PIL (`ImageDraw`) | text with FreeType antialiasing, images, simple shapes | **2.0 ms/frame**, low memory | **all text**, images, plain rectangles |
-| skia-python (`skia.Surface`) | antialiased paths, gradients, blur, masks, blend modes, clipping | **34.5 ms/frame**, 9 MB peak | shapes, diagrams, gradients, blur, clipping |
-
-The split: **skia for shapes, PIL for text.** Draw the frame in skia, take `makeImageSnapshot()` to a numpy array, `Image.fromarray(...)`, then draw text with PIL on top. Measured cost of that hybrid: **38 ms/frame**.
-
-Both are required, and the split is forced by two measured limits:
-
-- **skia cannot shape text.** `drawString` measured **439 px** for `مرحبا بالعالم` where PIL + RAQM measures **307 px** — isolated letters instead of joined script. Text goes through PIL, with `layout_engine=ImageFont.Layout.RAQM` for Arabic, Indic and Thai.
-- **PIL cannot antialias shapes, and it rounds to whole pixels.** A circle drawn with `ellipse` has one hard step at the edge — measured 2 distinct values across the transition, against fractional coverage in skia. It also snaps coordinates: moving a circle from x=100.0 to x=100.4 changed **0 pixels** (skia: 496). Invisible on a rectangle, obvious on a diagonal, a circle, or a line thinner than 3 px — and fatal to sub-pixel drift.
-
-If `pip install skia-python` fails (blocked network, no permission), stop and report it. Never render shapes without it, and never claim a rasteriser you have not verified. If nothing runs at all, follow "Honesty about the result" in `SKILL.md`.
+Shapes go through skia, text through PIL — the sync gate (§7) hooks `ImageDraw.ImageDraw.text`, so every text has to be drawn there. Measured at 1080×1920: 2 ms/frame for PIL text, 34 ms for shapes in skia, 38 ms for the hybrid. The frame function in §5 shows the arrangement.
 
 Store frames as `work/frames/00000.png` through `work/frames/01199.png`. To save memory you can pipe straight into ffmpeg (`-f rawvideo -pix_fmt rgb24 -s WxH -r 30 -i -`).
 
@@ -527,7 +511,7 @@ If nothing suitable exists or the licence is unclear, **draw it in code** rather
   ImageDraw.Draw(frame).text((80, 180), "KATA", font=ImageFont.truetype(FONT, 110), fill=INK)
   ```
 
-  **Sub-pixel drift is why shapes are drawn in skia.** PIL's `ImageDraw` rounds coordinates to whole pixels: a circle moved from x=100.0 to x=100.4 changed **0 pixels**, while skia changed 496. A 0.4 px-per-frame drift is exactly the micro-motion this workflow uses to keep a scene alive, so under PIL it renders as a still frame — and the encoder sees a freeze (§7).
+  **Sub-pixel drift is why shapes are drawn in skia.** PIL's `ImageDraw` rounds coordinates to whole pixels: a circle moved from x=100.0 to x=100.4 changed **0 pixels**, while skia changed 496. Drift under a pixel is the micro-motion this workflow uses to keep a scene alive, so under PIL it renders as a still frame — and the encoder sees a freeze (§7).
 - Simulate motion blur by averaging several sub-frames at slightly different times.
 - Render in parallel with resume: because frames are deterministic, draw with several workers (`multiprocessing`, 4–8 processes) and skip frames whose PNG already exists and is non-empty. If a render dies, rerun the same script — only missing frames are redrawn.
 
@@ -725,7 +709,7 @@ def check(ok, msg):
 print("\n".join(findings) if findings else "no findings")
 ```
 
-How to capture drawn text: wrap `ImageDraw.ImageDraw.text` — every text goes through it. Text drawn as a skia path is not captured; verify that scene from the time table instead.
+How to capture drawn text: wrap `ImageDraw.ImageDraw.text` — every text goes through it.
 
 **Sync gate.** For each key text prove two things: it exists at `word_time + 0.10` and does not exist at `word_time − 0.15` (the window is tunable; what matters is its asymmetry — 0.1 s late beats appearing early). Capture all drawn text by wrapping the text call, then match by text name.
 
@@ -733,9 +717,9 @@ ASR times are **voiceover time**; the renderer draws on **video time**. Add `vo_
 
 ```python
 seen = []
-orig = ImageDraw.ImageDraw.text                      # the real PIL method, not a wrapper class
+orig = ImageDraw.ImageDraw.text
 def patched(self, xy, s, *a, **kw):
-    if kw.get("fill") is not None and not kw.get("_skip"):
+    if kw.get("fill") is not None:
         seen.append(str(s))
     return orig(self, xy, s, *a, **kw)
 ImageDraw.ImageDraw.text = patched
