@@ -67,6 +67,20 @@ Quick check: `fc-list | grep -iE "poppins|fredoka|caveat"` — empty means not i
 
 Match to the video's mood (one display + one supporting usually covers it):
 
+**A film has three type roles, and they do not have to share a family.** The
+pairing is the design, and one family used for all three is what makes a video read as a
+template:
+
+| Role | Carries | Typical register |
+|---|---|---|
+| **display** | the keyword, the number, the verdict | impact / kinetic, or rounded for a light topic |
+| **meta** | labels, indices, chips, footnotes | mono or small-caps serif — words *about* the video |
+| **accent** | an annotation, a scribble, an arrow label | handwriting — used sparingly, never for body |
+
+Pick each role from the topic's register, and pick them as a *set*: a doodle topic takes
+rounded + handwriting + mono, an archival topic takes serif + small-caps + mono. Using only
+the "Modern, neutral" row for every film is the failure this table is here to prevent.
+
 | Mood / style | Fonts | Notes |
 |---|---|---|
 | Modern, neutral, UI-like | `Poppins` (Regular/SemiBold/Bold), `Inter`, `Montserrat`, `Manrope`, `DM Sans`, `Figtree` | Safe standard for narration and body text |
