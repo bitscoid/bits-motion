@@ -31,6 +31,11 @@ The output is an **MP4 (H.264 + AAC, 30 fps, constant frame rate)** whose length
 | Portrait `1080×1920` | **60 s** | Reels / TikTok / Shorts |
 | Landscape `1920×1080` | **300 s** (5 min) | YouTube explainer |
 
+Content box for portrait: **13% top / 20% bottom / 5% on both sides** — `x 54..1026,
+y 250..1536` (972×1286, **60% of the frame**), readable text above 28% from the bottom. Below
+55% of the height the action rail pulls the right edge to 88% (`x ≤ 950`). Checked by
+`qc/safe_band.py`; see *Typography geometry* below.
+
 Longer only when you ask. Orientation is chosen in stage 1, before the script is written, because it sets the cap; a supplied reference must match that orientation and never changes it. Without an answer it asks once, then defaults to **1920×1080** landscape.
 
 ---
@@ -158,7 +163,7 @@ Word-count estimation is the documented fallback, clearly labelled as approximat
 <details open>
 <summary><b>📐 Typography geometry</b></summary>
 
-- Safe area: **4%** from every edge — and for portrait short-form, **10% from the bottom / 12% from the right** as the floor, with anything that must be read kept at **15% from the bottom** because the platform UI sits over that band
+- Safe area: **4%** from every edge for anything that carries meaning. Portrait adds one content box: **13% top / 20% bottom / 5% on both sides** — `x 54..1026, y 250..1536` on 1080×1920, 972×1286, **60% of the frame**, horizontally centred. Below **55% of the height** the action rail (like/comment/share) pulls the right edge to **88%** (`x ≤ 950`). Text that must be read stays above **28% from the bottom** (y ≤ 1382). Landscape keeps 4%, with **10%** title-safe for readable text
 - **Cap height**, not font size: **4%** of the short side for primary text, **2.5%** for supporting text (1080p landscape → 43 px / 27 px). Measured once per face (`font.getbbox("H")`), never from a string's bbox
 - Centring is measured from the glyph box, never delegated blindly to `anchor="mm"`
 - Text collision checked by **coverage of the smaller box (< 0.02)**, not IoU — IoU 0.16 lets a 20% line overlap pass
@@ -293,7 +298,7 @@ Then verifies it before use — under 10 KB means an HTML error page, not a font
 
 ## ⚠️ Honest limits
 
-- Music is **synthesised** unless you supply your own — simple chords, not a composition
+- Music is **synthesised** unless you supply your own — a generated chord progression (pad, bass, arpeggio), not a composition
 - Word timing is **approximate** when ASR is unavailable, and the delivery message says so
 - The agent cannot watch the video; visual QC relies on extracted frames, contact sheets, and measured numbers
 - Capped at **60 s portrait / 300 s landscape** — a five-minute explainer, not a documentary tool

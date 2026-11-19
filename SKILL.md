@@ -173,6 +173,12 @@ Tool configuration a Python pipeline needs — `requirements.txt`, `pyproject.to
 - Decide the title in stage 1 alongside the script, and tell the user the slug before writing any file.
 - `work/` can be created at any point, and `rm -rf work` costs only rebuildable seconds: user inputs stay in `audio/` and `assets/`, and the one non-reproducible derived file — `audio/words.json` — lives in `audio/` beside its source. Re-render restores the full video with identical timing.
 
+## Bundled helpers
+
+| Script | Does |
+|---|---|
+| `scripts/make_music.py` | synthesises the background bed — four-chord progression, root bass, plucked arpeggio, noise breath at each chord change. Exact duration, 48 kHz stereo WAV, peak −6 dBFS. Flags: `--duration --out --tempo --mood`; see `references/RENDER.md` §8 |
+
 ## Workflow
 
 Follow this order. Do not jump to render before stages 1–3 are done.
@@ -227,7 +233,7 @@ kecuali suara — suara yang menentukan panjang dan penyesuaian waktu video.
    dari naskah yang sudah Anda setujui.
 
 2. Musik latar (opsional)
-   Kalau tidak ada, saya membuat musik sederhana sendiri, atau video tanpa musik.
+   Kalau tidak ada, saya membuat musik latar sintetis sendiri (progresi akor + bass, bukan lagu jadi), atau video tanpa musik.
 
 3. Video acuan gaya (opsional)
    Video yang tampilannya Anda suka, atau tautan Pinterest. Kalau tidak ada,
@@ -257,7 +263,7 @@ tipografinya.
 | Media | Lands at | Status | If the user has none |
 |---|---|---|---|
 | Voiceover recording | `audio/voiceover.wav` | Strongly recommended; it is the timing source | See "Without a voiceover" below |
-| Background music | `audio/music.wav` | Optional | You generate simple music, or render silent |
+| Background music | `audio/music.wav` | Optional | `scripts/make_music.py` generates a chord-progression bed, or render silent |
 | Style reference video | `assets/reference.mp4` | Optional | Search Pinterest for `motion graphics` + topic keywords (stage 3); if nothing fits, design the style yourself |
 | Supporting images (1st, 2nd, …) | `assets/image-01.png`, `assets/image-02.png`, … | Optional | You find suitable images online, draw them in code, or both |
 | Screen orientation | — | Asked with the script in stage 1; repeat here only if still open | Default landscape 1920×1080 → cap 300 s; portrait 1080×1920 → cap 60 s |
@@ -410,13 +416,15 @@ Read both reference documents before building anything:
 - `references/GUIDE.md` — creative direction, typography, asset animation, transitions, **translating ideas into visuals (§5), cross-scene variation (§6)**, audio mixing.
 - `references/RENDER.md` — environment check, fonts, the render pipeline (PIL for text, skia for shapes), ffmpeg commands, verification.
 
-**Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier cap height, WCAG contrast, text collision (coverage), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against the shapes your own scene code draws. Every project has its own shapes.
+**Write QC checks yourself** when you need them. The rules are already complete in prose: safe area, two-tier cap height, WCAG contrast, text collision (coverage), and repetition patterns — all in `GUIDE.md` §2 and `RENDER.md` §7. Translate them into code against the shapes your own scene code draws. Every project has its own shapes. Copy `qc/safe_band.py` into the project as the one fixed check — it asserts the portrait content box and the action rail so the numbers cannot drift from the prose, and costs milliseconds.
 
 Two checks are not optional because they protect the file itself, and both catch failures that look fine on screen:
 - **frame contiguity** before encoding (`RENDER.md` §6) — a missing PNG silently truncates the MP4;
 - **final mix loudness and tail floor** (`RENDER.md` §7) — a quiet mix or a music track that ends early passes every visual gate.
 
 Before writing scene code, give every core point one visual mechanism that can be drawn (`GUIDE.md` §5). If the plan still reads "big word in the centre" for every scene, that is a warning sign worth revisiting before you build — not automatically wrong, but usually an idea that has not been found yet.
+
+Before writing scene code, also scan the plan for the three template defaults in `GUIDE.md` §6 — a label in the same corner, a bar at one fixed y, one accent block behind every keyword. Any of them appearing in more than two consecutive beats is a habit, not a design; change it or write down why it is right for this film.
 
 ### Stage 7 — QC and delivery
 
@@ -497,7 +505,7 @@ Yang saya buat otomatis
 - [naskah / suara / musik / elemen grafis — sebutkan yang benar-benar otomatis]
 
 Catatan
-- [musik sintetis, bukan komposisi profesional]
+- [musik sintetis: progresi akor, bass, dan arpeggio dibuat lewat kode — bukan lagu jadi]
 - [waktu per kata hanya perkiraan, karena pengenalan suara tidak tersedia]
 - [berkas antara sudah dihapus]
 

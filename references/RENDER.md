@@ -797,7 +797,37 @@ check(ratio(fill, bg_color) >= (3.0 if is_main else 4.5), f"contrast too low: {s
 
 A label sitting inside a title block legitimately scores cover 1.0 — that is why the identical-box exclusion exists and why this is advice to read, not a hard fail. What it must catch: two independent lines that share any real band of pixels.
 
-For a **portrait** export, run the platform band as a second check on primary text: 10% from the bottom and 12% from the right (`GUIDE.md` §2), and 15% from the bottom for anything that must be read. The 4% gate above still covers every element.
+For a **portrait** export, run the content box as a second check on top of the 4% gate (`GUIDE.md` §2). One box, symmetric sides:
+
+```python
+S = min(W, H)
+BOX  = dict(top=0.13, bottom=0.20, left=0.05, right=0.05, read=0.28)
+RAIL = dict(from_y=0.55, inset_right=0.12)   # like/comment/share sit lower-right
+
+if PORTRAIT:                       # 1080x1920 -> x 54..1026, y 250..1536
+    check(bb[0] > W * BOX["left"], f"crosses left margin: {s}")
+    check(bb[2] < W * (1 - BOX["right"]), f"crosses right margin: {s}")
+    check(bb[1] > H * BOX["top"], f"crosses top band: {s}")
+    check(bb[3] < H * (1 - BOX["bottom"]), f"crosses caption stack: {s}")
+    # the rail exists only below the line: above it the full width is usable
+    if bb[3] > H * RAIL["from_y"]:
+        check(bb[2] < W * (1 - RAIL["inset_right"]), f"crosses the action rail: {s}")
+    if is_readable:                # anything that must be read
+        check(bb[3] < H * (1 - BOX["read"]), f"below the read line: {s}")
+elif is_readable or is_caption:    # landscape: title-safe, no box
+    # 1920x1080 -> x 192..1728, y 108..972. A caption at the usual 80-120 px
+    # floor lands at y 960..1000 and crosses y 972 — put it inside the box.
+    check(bb[3] < H * 0.90 and bb[1] > H * 0.10 and
+          bb[0] > W * 0.10 and bb[2] < W * 0.90, f"outside title-safe: {s}")
+```
+
+The box covers **60% of the frame** and its horizontal centre is the frame centre, so ordinary centring works; only the vertical centre sits 67 px high. The bottom margin (20%) is the largest because every vertical platform stacks its UI there, while the top carries only a header. Sources for these numbers: `_vendor/explainer-video-skills/skills/wrapped-video/references/scene-grammar.md` (top 12%, bottom 18%, sides 5%) and `_vendor/motioner/references/typography.md` (top 250 px, bottom 400 px on a 1080-wide frame); top is 13% to clear the taller of the two.
+
+These numbers are organic short-form, not an ad spec (`GUIDE.md` §2). This skill never runs `hyperframes check`, so the ad box those guides define is not consulted here at all.
+
+The box binds **content**. Backgrounds, gradients, grain and shapes with no meaning may bleed past it, but still obey the 4% edge.
+
+Landscape has no box, but it does have a rule for readable text and captions: **10% title-safe** on all four sides. Treat a burned-in caption as readable — it is the accessibility layer.
 
 **Contrast gate** uses the same WCAG formula as `GUIDE.md` §2, with the threshold tied to the text's role: **3.0:1** for primary text, **4.5:1** for supporting text. Measured pairs, reproducible with the formula above:
 
@@ -879,9 +909,27 @@ Measured: 60 s → 20 cells in 5×5; 300 s → 100 cells in 10×10. Never hand-t
 
 ## 8. Self-made background music
 
-Only when the user supplies none. Build a simple ambient pad with numpy or ffmpeg's `aevalsrc`/`sine`: several chord tones layered at low volume, plus a light pulse whose tempo suits the visual rhythm (choose it yourself; if you want a beat accent, align it with scene changes). Export as 48 kHz WAV, then feed it into the mix above.
+Only when the user supplies none. Use the bundled generator — a single held pad is what made every film from these skills sound the same:
 
-Tell the user plainly that this is simple synthesised music, not a professional composition, and suggest royalty-free music for a richer result.
+```bash
+python3 <skill>/scripts/make_music.py --duration 52 --out audio/music.wav --tempo 84 --mood warm
+```
+
+`<skill>` is this skill's own directory; the generator ships with the skill, so the
+project folder stays free of build tooling. Run it from the project folder.
+
+It writes 48 kHz stereo 16-bit WAV at exactly `--duration` (so the bed never needs looping), peak −6 dBFS, 1.2 s fade-in, and a fade-out that lands on a floor instead of absolute zero.
+
+The bed is a four-chord progression (two bars per chord): each chord gets a detuned two-voice pad, a root bass on beats 1 and 3, a plucked arpeggio on eighths that alternates pan, and a soft noise breath at each chord change.
+
+| Flag | Values | Choose by |
+|---|---|---|
+| `--mood` | `warm` (Am–F–C–G) · `dark` (Dm–B♭–F–C) · `bright` (C–Em–Am–F) | the topic's tone — `dark` for history/analysis, `bright` for light explainers |
+| `--tempo` | 60–100, default 84 | the film's cut rhythm; set it below the cut rate so the pulse never fights the narration |
+
+Pick a different `--mood`/`--tempo` per film instead of reusing one bed across a series. If a scene change deserves an accent, place it in the mix rather than bending the bed's tempo.
+
+Tell the user plainly that this is synthesised music — a progression and a pulse generated in code, not a composed track — and suggest royalty-free music when they want more.
 
 Optional, sparing synthetic SFX for transitions — a whoosh, for example:
 
