@@ -55,6 +55,74 @@ That's the whole interface. No config file, no CLI flags, no build step. The ful
 
 ---
 
+## 🧭 Where it runs, and what a full run looks like
+
+### Any directory, one folder per video
+
+Run the agent from any directory — your home, a projects folder, a client folder. You create
+nothing first. Stage 1 derives a slug from the topic title, tells you the slug, then creates
+that folder and works inside it.
+
+```
+~/projects/
+├── tiga-mitos-otak/      ← created by run 1
+└── kopi-dan-tidur/       ← created by run 2
+```
+
+Three rules govern collisions:
+
+| Situation | What happens |
+|---|---|
+| Same topic again | Continues in the existing folder and overwrites the same file names — a revision, not a copy |
+| Different topic, same slug | Stops and asks before touching anything |
+| Anything else | Creates a new folder, never `-2`, `-3` or a date suffix |
+
+Nothing is shared between projects: no global config, no state file, no daemon. Two folders can
+be rendered side by side and cannot affect each other.
+
+### The run, stage by stage
+
+| Stage | What happens | What you see |
+|---|---|---|
+| 1 · Script | Orientation and cap decided first, because the cap sets the script length. Script written with `[Hook]`/`[Inti N]`/`[Penutup]` labels | The script in Indonesian, with format and word count |
+| 2 · Assets | One message asking for recording, music, reference, images, orientation, captions — **once** | Six numbered questions, all optional except the voice |
+| 3 · Readiness | Confirms, or fills gaps from documented defaults | One line, or a single clarifying question |
+| 4 · Measure | Real voiceover duration, ASR word timing, reference read, font choice | The style brief and the exact duration |
+| 5 · Timeline | One absolute-time table | Nothing — internal planning |
+| 6 · Build | Scene code, then render, then one `loudnorm` pass | Progress, then the raw file |
+| 7 · QC | Gates measured from the exported file | The delivery numbers and `publish.txt` |
+
+### End to end, with the commands
+
+```bash
+mkdir -p ~/projects && cd ~/projects
+```
+
+Then ask the agent, in Indonesian:
+
+```
+buatkan motion graphic tentang kenapa kopi bikin ngantuk
+```
+
+It replies with the script and, in the same message, the six asset questions. Answer them or
+say `buat semuanya otomatis`. From there it creates `~/projects/kenapa-kopi-bikin-ngantuk/`,
+fills it, and runs the build:
+
+```bash
+cd ~/projects/kenapa-kopi-bikin-ngantuk
+python3 render.py                                  # frames, then ffmpeg
+ls output/kenapa-kopi-bikin-ngantuk.mp4            # the deliverable
+```
+
+| Path | What it is |
+|---|---|
+| `output/<slug>.mp4` | the video |
+| `output/publish.txt` | caption, description, hashtags |
+| `render.py` | the whole visual design |
+| `audio/words.json` | the timing table, durable |
+
+Re-running `python3 render.py` in the same folder produces the same video from the same inputs.
+
 ## 🧠 Design philosophy
 
 This skill is **rules, not a template.**
