@@ -821,7 +821,7 @@ elif is_readable or is_caption:    # landscape: title-safe, no box
           bb[0] > W * 0.10 and bb[2] < W * 0.90, f"outside title-safe: {s}")
 ```
 
-The box covers **60% of the frame** and its horizontal centre is the frame centre, so ordinary centring works; only the vertical centre sits 67 px high. The bottom margin (20%) is the largest because every vertical platform stacks its UI there, while the top carries only a header. Sources for these numbers: `_vendor/explainer-video-skills/skills/wrapped-video/references/scene-grammar.md` (top 12%, bottom 18%, sides 5%) and `_vendor/motioner/references/typography.md` (top 250 px, bottom 400 px on a 1080-wide frame); top is 13% to clear the taller of the two.
+The box covers **60% of the frame** and its horizontal centre is the frame centre, so ordinary centring works; only the vertical centre sits 67 px high. The bottom margin (20%) is the largest because every vertical platform stacks its UI there, while the top carries only a header. Sources for these numbers: `~/.agents/skills/iart-wrapped-video/references/scene-grammar.md` (top 12%, bottom 18%, sides 5%) and `~/.agents/skills/motioner/references/typography.md` (top 250 px, bottom 400 px on a 1080-wide frame); top is 13% to clear the taller of the two.
 
 These numbers are organic short-form, not an ad spec (`GUIDE.md` §2). This skill never runs `hyperframes check`, so the ad box those guides define is not consulted here at all.
 
