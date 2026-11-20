@@ -64,12 +64,13 @@ That's the whole interface. No config file, no CLI flags, no build step. The ful
 
 ### Any directory, one folder per video
 
-Run the agent from any directory — your home, a projects folder, a client folder. You create
-nothing first. Stage 1 derives a slug from the topic title, tells you the slug, then creates
-that folder and works inside it.
+Run the agent from whatever directory you want the projects to live in — the skill creates
+projects in the **current directory** (flat, no wrapper folder), so the location stays dynamic.
+You create nothing first. Stage 1 derives a slug from the topic title, tells you the slug, then
+creates that folder right there and works inside it.
 
 ```
-~/projects/
+<current directory>/
 ├── tiga-mitos-otak/      ← created by run 1
 └── kopi-dan-tidur/       ← created by run 2
 ```
@@ -100,7 +101,7 @@ be rendered side by side and cannot affect each other.
 ### End to end, with the commands
 
 ```bash
-mkdir -p ~/projects && cd ~/projects
+cd <direktori kerja pilihan Anda>   # project dibuat di current directory
 ```
 
 Then ask the agent, in Indonesian:
@@ -110,11 +111,11 @@ buatkan motion graphic tentang kenapa kopi bikin ngantuk
 ```
 
 It replies with the script and, in the same message, the six asset questions. Answer them or
-say `buat semuanya otomatis`. From there it creates `~/projects/kenapa-kopi-bikin-ngantuk/`,
+say `buat semuanya otomatis`. From there it creates `./kenapa-kopi-bikin-ngantuk/` in the current directory,
 fills it, and runs the build:
 
 ```bash
-cd ~/projects/kenapa-kopi-bikin-ngantuk
+cd ./kenapa-kopi-bikin-ngantuk
 python3 render.py                                  # frames, then ffmpeg
 ls output/kenapa-kopi-bikin-ngantuk.mp4            # the deliverable
 ```
