@@ -56,10 +56,9 @@ Every project follows `/root/BITS/company/workflows/struktur-proyek-video.md`. I
   qc/                        checking scripts
 ```
 
-Never create `renders/`, `out/`, or leave a video in the project root. The publish scheduler, the
-video counter and the completeness checker all read `output/`; anything elsewhere reads as a
-missing film. File names are lowercase English — `voiceover.wav`, never `Suara Voiceover.wav` —
-because a checker that looks for the standard name reports the film as broken.
+`output/` is the only place a finished film lives. The publish scheduler, the video counter and
+the completeness checker read nothing else. File names are lowercase English: `voiceover.wav`,
+`script.txt` — a checker looking for the standard name reports anything else as a broken film.
 
 ## Fixed specifications
 
