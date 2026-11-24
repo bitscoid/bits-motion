@@ -42,6 +42,25 @@ Use the same rule for a supplied recording's metadata, a PDF, or a screenshot th
 
 Batch when there are several images in one stage — a single `vision` call naming all paths beats one call per file.
 
+## Project structure — one shape for every film
+
+Every project follows `/root/BITS/company/workflows/struktur-proyek-video.md`. In short:
+
+```
+<slug>/
+  index.html | render.py     the code
+  script.txt                 narration (never naskah.txt)
+  audio/                     voiceover.wav, music.wav, words.json
+  assets/                    fonts, images, material
+  output/                    the ONLY place for <slug>.mp4 and publish.txt
+  qc/                        checking scripts
+```
+
+Never create `renders/`, `out/`, or leave a video in the project root. The publish scheduler, the
+video counter and the completeness checker all read `output/`; anything elsewhere reads as a
+missing film. File names are lowercase English — `voiceover.wav`, never `Suara Voiceover.wav` —
+because a checker that looks for the standard name reports the film as broken.
+
 ## Fixed specifications
 
 | Parameter | Value |
