@@ -24,14 +24,13 @@ ffmpeg -hide_banner -encoders 2>/dev/null | grep -E "(libx264|aac)" || echo "WAR
 python3 -c "import PIL, numpy; print('PIL+numpy ok')"
 python3 -c "import skia; print('skia', skia.__version__)"
 python3 -c "import faster_whisper; print('word-level ASR: available')" 2>/dev/null || echo "ASR: unavailable (pip install faster-whisper; without it word timing becomes an estimate -- tell the user)"
-fc-list | head -20          # available fonts
 [ -n "$GEMINI_API_KEY" ] && echo "GEMINI_API_KEY: present" || echo "GEMINI_API_KEY: absent"
 which curl yt-dlp           # curl for TTS, yt-dlp for URL references
 NC=$(timeout 8 curl -s -o /dev/null -w '%{http_code}' https://generativelanguage.googleapis.com/v1beta/models 2>/dev/null)
 case "$NC" in 200|403|404) echo "network: OK (HTTP $NC)";; *) echo "network: PROBLEM (HTTP $NC / timeout)";; esac
 ```
 
-Network access is often restricted. If external downloads are blocked, use fonts already on the system; extra fonts come from the Google Fonts route in §1. The ffmpeg version dictates which options are legal (see §6).
+Network access is often restricted. Fonts come from Google Fonts into `assets/fonts/`; if a download is blocked, say so and ask — never substitute a system font (§1). The ffmpeg version dictates which options are legal (see §6).
 
 ### Vision capability (measured, never assumed)
 
@@ -59,93 +58,50 @@ Then ask the main session to read `work/vision-probe.png` and report the text an
 
 Batch several images into one delegated call. Timing, scene code, rendering, and every QC number stay in the main session — the subagent returns a description, not a decision. Delete `work/vision-probe.png` with the rest of `work/` at cleanup (§10).
 
-### Fonts ready to use (`~/.local/share/fonts/motion/`)
+### Fonts — always downloaded into the project
 
-**This catalogue is a starting point, not a menu.** If the topic needs typography that isn't here, download it (next subsection). Picking an installed font merely because it exists is the fastest route to making every video look the same.
+**A font is never read from the machine.** No `~/.local/share/fonts`, no
+`fc-list`, no family that merely happens to be installed, no sample font shipped
+with this skill. A film that depends on a system font renders differently on
+another machine, after a rebuild, or inside a container — and the failure is
+silent, because PIL quietly substitutes a fallback.
 
-Quick check: `fc-list | grep -iE "poppins|fredoka|caveat"` — empty means not installed (see *Adding a new font* below).
-
-Match to the video's mood (one display + one supporting usually covers it):
-
-**A film has three type roles, and they do not have to share a family.** The
-pairing is the design, and one family used for all three is what makes a video read as a
-template:
-
-| Role | Carries | Typical register |
-|---|---|---|
-| **display** | the keyword, the number, the verdict | impact / kinetic, or rounded for a light topic |
-| **meta** | labels, indices, chips, footnotes | mono or small-caps serif — words *about* the video |
-| **accent** | an annotation, a scribble, an arrow label | handwriting — used sparingly, never for body |
-
-Pick each role from the topic's register, and pick them as a *set*: a doodle topic takes
-rounded + handwriting + mono, an archival topic takes serif + small-caps + mono. Using only
-the "Modern, neutral" row for every film is the failure this table is here to prevent.
-
-| Mood / style | Fonts | Notes |
-|---|---|---|
-| Modern, neutral, UI-like | `Poppins` (Regular/SemiBold/Bold), `Inter`, `Montserrat`, `Manrope`, `DM Sans`, `Figtree` | Safe standard for narration and body text |
-| Playful, doodle, rounded | `Baloo 2`, `Fredoka`, `Quicksand`, `Nunito`, `Gochi Hand` | Light topics, informal education, children/youth |
-| Handwriting, annotation | `Caveat`, `Patrick Hand`, `Indie Flower`, `Kalam`, `Gochi Hand` | Annotation accents, arrows, scribbles |
-| Elegant / retro script | `Pacifico`, `Dancing Script`, `Shrikhand` | Wordmarks, casual headlines — rarely body text |
-| Impact, kinetic type | `Bebas Neue`, `Anton`, `Archivo Black`, `Oswald`, `Archivo`, `Unbounded`, `Syne` | Big keywords, hooks, statistics |
-| Editorial / firm serif | `Fraunces`, `Instrument Serif`, `Libre Caslon Text`, `DM Serif Display`, `Newsreader`, `Gloock` | Quotes, large figures, history or serious topics |
-| Technical / data / mono | `JetBrains Mono`, `Space Mono`, `Space Grotesk`, `IBM Plex Mono`, `Sora`, `Epilogue` | Small labels, statistics, data and tech feel |
-| Expressive / display | `Bricolage Grotesque`, `Shrikhand`, `Unbounded`, `Syne` | Titles that carry personality — usually once per video |
-
-Mix across categories freely. The catalogue widens the range of moods available; it does not prescribe which one to pick.
-
-Usage: in PIL pass the TTF path directly (`~/.local/share/fonts/motion/Baloo2.ttf`). Variable fonts (Inter, Montserrat, Baloo2, Fredoka, Quicksand, Nunito, Caveat, DancingScript) carry every weight in one file; call `ImageFont.truetype(..., size).set_variation_by_axes([weight])`. Poppins is not variable: use the separate files `Poppins-Regular.ttf`, `Poppins-SemiBold.ttf`, `Poppins-Bold.ttf` (there is no `Poppins.ttf`).
-
-### Adding a new font
-
-When the topic needs typography that isn't installed, download it. Three routes, in order:
+**One route only: download from Google Fonts, store it in the project.**
 
 ```bash
-# 1) Google Fonts via github/google/fonts — most reliable, direct TTF
-#    path pattern: <licence>/<slug>/<FileName>.ttf   (licence: ofl | apache | ufl)
-SLUG=outfit; FILE="Outfit%5Bwght%5D.ttf"     # %5B = [ , %5D = ] for variable fonts
-curl -sL -o "/tmp/$SLUG.ttf" "https://github.com/google/fonts/raw/main/ofl/$SLUG/$FILE"
-
-# 2) if the slug or filename is unknown, ask the API.
-#    Note: listings often put the Italic file first -- filter it out.
-#    Filenames containing [ ] must be URL-encoded (%5B / %5D) when downloaded.
-SLUG=outfit
-curl -s "https://api.github.com/repos/google/fonts/contents/ofl/$SLUG" \
-  | python3 -c "
-import json, sys, urllib.parse
-fs = [f['name'] for f in json.load(sys.stdin) if f['name'].endswith('.ttf')]
-plain = [f for f in fs if 'italic' not in f.lower()] or fs
-pick = plain[0]
-print('pick:', pick)
-print('url :', 'https://github.com/google/fonts/raw/main/ofl/$SLUG/' + urllib.parse.quote(pick))
-"
-
-# 3) if GitHub is blocked: ask Google's CSS API for a direct TTF.
-#    The "Mozilla/4.0" UA is deliberate -- modern UAs get woff2, which PIL cannot
-#    read; this one gets a static .ttf per weight, ready for ImageFont.truetype.
-SLUG=outfit; WEIGHT=700
-URL=$(curl -s -A "Mozilla/4.0" "https://fonts.googleapis.com/css?family=Outfit:$WEIGHT" \
-  | python3 -c "import sys,re; m=re.search(r'url\((https://[^)]+\.ttf)\)', sys.stdin.read()); print(m.group(1) if m else '')")
-[ -n "$URL" ] && curl -sL -o "/tmp/$SLUG-$WEIGHT.ttf" "$URL"
+mkdir -p assets/fonts
+# one file per family; variable fonts carry every weight
+curl -sL -o assets/fonts/Outfit.ttf \
+  "https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf"
 ```
 
-Route 3 returns a **static instance** of one weight, not a variable font — do not call `set_variation_by_axes` on it.
+Verify before writing any scene code — a failed download is an HTML error page,
+not a font:
 
-If all three routes fail, use an installed font and say so — do not fall back to a font that renders tofu.
+```bash
+python3 - <<'PY'
+from PIL import ImageFont
+f = ImageFont.truetype("assets/fonts/Outfit.ttf", 96)
+print(f.getname(), f.getbbox("H"))      # real family name and a capital box
+PY
+```
 
-**Verify before using it in a scene** — a broken download surfaces deep into a render:
+Under 10 KB on disk, or an exception above, means the download failed: fix the
+URL or pick another Google Fonts family. Never fall back to a system font, and
+never proceed with a font that renders tofu.
+
+Render only ever points at the project copy:
 
 ```python
-from PIL import ImageFont
-f = ImageFont.truetype("/tmp/outfit.ttf", 80)   # route 3 saves /tmp/<slug>-<weight>.ttf
-print(f.getname())                        # the real family name, not the filename
-print(f.getbbox("Baca Tulis"))            # must return a box, not raise
-f.set_variation_by_axes([700])            # variable fonts only, not a route-3 instance
+F_DISPLAY = ImageFont.truetype("assets/fonts/Outfit.ttf", 96)
+F_DISPLAY.set_variation_by_axes([700])   # variable files only
 ```
 
-Under 10 KB means an HTML error page, not a font. Copy it to `~/.local/share/fonts/motion/` using the family name (e.g. `Outfit.ttf`) and pass the path directly to PIL.
-
-Choose the font that **suits the topic**, not the one that is easiest to download. If every download fails, use what is installed and tell the user the ideal typography was not reached — never quietly fall back to a bad default (§9).
+**Choose the family from the topic, not from what is easy to fetch.** Pick three
+roles as a set — display (the keyword), meta (labels, indices), accent (a
+handwritten annotation, used sparingly) — and state the reason in one sentence.
+Do not let one family carry all three roles; that is what makes a film read as a
+template. If a chosen family is not on Google Fonts, choose another that is.
 
 ## 2. The render pipeline
 
@@ -264,7 +220,22 @@ The two caps are different products, not a preference: a portrait clip runs in a
 
 ### When there is no voiceover
 
-1. **Generate with Gemini TTS** (needs `GEMINI_API_KEY`). Current models: `gemini-3.8-flash-tts` (best) and `gemini-3.8-flash-lite-tts` (separate quota). If either 404s, check Google's current model list.
+1. **Generate with Gemini TTS** (needs a Gemini key). Current models: `gemini-3.8-flash-tts` (best) and `gemini-3.8-flash-lite-tts` (separate quota). If either 404s, check Google's current model list.
+
+   **Keys rotate automatically — never hardcode one key.** Quota is counted per key *per model* (free tier ≈10 TTS requests/day). The shared helper lists every key in priority order — `$GEMINI_API_KEY`, then each `/root/.hermes/keys/*.key`, then `GEMINI_API_KEY` in `/root/.hermes/.env` — and the same set is used by bits-affiliate, bits-motion, bits-hyperframes and bits-bang-motion:
+
+   ```bash
+   python3 /root/.hermes/keys/gemini_key.py     # how many keys are ready
+   ```
+
+   ```python
+   import sys; sys.path.insert(0, "/root/.hermes/keys")
+   from gemini_key import keys
+
+   daftar = keys()          # ordered, de-duplicated
+   ```
+
+   On a `429` / `RESOURCE_EXHAUSTED` / `API_KEY_INVALID` response, mark that key spent and try the next one before giving up. To add capacity, drop a new file at `/root/.hermes/keys/<name>.key` (chmod 600, contents = the key alone); no code change needed. Never print a key value into logs or reports — `key#N` is enough.
 
 The TTS API is the **Interactions** endpoint today: `POST /v1beta/interactions`, style in `input[].content[].annotations[].style`, audio in `steps[].content[].data`. The older `:generateContent` + `inlineData` shape still exists but does not carry `speech_metadata`; use it only as a fallback.
 
@@ -912,8 +883,13 @@ Measured: 60 s → 20 cells in 5×5; 300 s → 100 cells in 10×10. Never hand-t
 Only when the user supplies none. Use the bundled generator — a single held pad is what made every film from these skills sound the same:
 
 ```bash
-python3 <skill>/scripts/make_music.py --duration 52 --out audio/music.wav --tempo 84 --mood warm
+python3 <skill>/scripts/make_music.py --duration 52 --out audio/music.wav \
+    --brief "pasar subuh, hangat, akustik, tenang, sedikit melankolis"
 ```
+
+**Write the brief from the topic — never reuse the previous film's brief.** The brief decides
+scale, chord progression, timbre family, bass motion, arpeggio density, texture and tempo,
+and seeds the randomness.
 
 `<skill>` is this skill's own directory; the generator ships with the skill, so the
 project folder stays free of build tooling. Run it from the project folder.
@@ -924,10 +900,13 @@ The bed is a four-chord progression (two bars per chord): each chord gets a detu
 
 | Flag | Values | Choose by |
 |---|---|---|
-| `--mood` | `warm` (Am–F–C–G) · `dark` (Dm–B♭–F–C) · `bright` (C–Em–Am–F) | the topic's tone — `dark` for history/analysis, `bright` for light explainers |
-| `--tempo` | 60–100, default 84 | the film's cut rhythm; set it below the cut rate so the pulse never fights the narration |
+| `--brief` | free text (required) | the topic's mood and material — this is the creative decision, write it fresh per film |
+| `--tempo` | 60–120 | the film's cut rhythm; omit to let the brief decide |
+| `--seed` | integer | force a different take from the same brief |
 
-Pick a different `--mood`/`--tempo` per film instead of reusing one bed across a series. If a scene change deserves an accent, place it in the mix rather than bending the bed's tempo.
+Each film gets its own brief. Reusing one bed, or one brief, across a series is what made
+every film sound alike. If a scene change deserves an accent, place it in the mix rather
+than bending the bed's tempo.
 
 Tell the user plainly that this is synthesised music — a progression and a pulse generated in code, not a composed track — and suggest royalty-free music when they want more.
 
@@ -944,7 +923,7 @@ Use at most a few per video, always below the voiceover level, and tell the user
 - **VFR (variable frame rate):** force CFR with `-r 30`. Verify `r_frame_rate` and `avg_frame_rate` both read 30/1.
 - **Duration off by a frame:** usually the drawn frame count differs from `DUR × 30`. Recount before encoding.
 - **Audio longer than video** (or the reverse): use `apad=whole_dur=$DUR` and `atrim=0:$DUR` as in the example, plus `-t $DUR`.
-- **Font not found:** check `fc-list`, or download it through the recipe in §1 — never silently fall back to an ugly default.
+- **Font not found:** the path you passed is not the one in the project. Fonts live in `assets/fonts/` (§1); re-download it there — never fall back to a system font or an ugly default.
 - **Indonesian text clipped at the edge:** measure width with the font's own measuring function, never by eye.
 - **File very large:** raise CRF (e.g. 20–22); never lower the resolution.
 - **`alimiter` installed yet `max_volume` stays 0 dB:** alimiter's default `level` is 1 (auto-level) — after limiting, the signal is normalised BACK to 0 dBFS. Use `alimiter=limit=0.85:level=0`. Measured: `limit=0.79` alone still yields max 0.0 dB; with `level=0` it yields −1.3 dB.

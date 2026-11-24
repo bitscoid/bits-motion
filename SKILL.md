@@ -76,11 +76,15 @@ A rule that passes (1) but fails (2) is a restriction, not a standard. Rejected 
 
 Every number left in these documents **protects** something (legibility, safe area, contrast, encoder behaviour). If you find a number that dictates taste, treat it as a bug in this document: skip it and say so.
 
-Never treat anything in `references/` as a template. What transfers is the measuring method, not the measured result. The font catalogue is a starting point, not a menu — if the topic needs typography that isn't installed, download it.
+Never treat anything in `references/` as a template. What transfers is the measuring method, not the measured result. There is no font catalogue and no reliance on installed fonts: every family is downloaded from Google Fonts into the project's `assets/fonts/` (recipe in `references/RENDER.md` §1).
 
 One exception that is commonly misread: on-screen text **does not** need a supporting word in the voiceover. Silent emphasis is legitimate — just record the reason in the timeline.
 
 **QC gates flag, they do not judge.** When a check reports a finding, decide: a defect to fix, or an intentional choice to document. Passing every gate means "not broken", never "good".
+
+Two findings vision gets wrong, measured 2026-11:
+- **"Empty/frozen panel" is real, and it comes from reveal-by-word timing.** A card whose frame is drawn when the *scene* starts but whose labels wait for a later *word* shows bare skeleton bullets for seconds. Draw a list item's marker only once its label is readable (`if on > 0.05` before the ring/checkbox), and start the labels at the scene's first word, not at a word from a later sentence.
+- **"Two frames are identical" is usually false.** Verify with a numpy pixel diff before re-rendering: `np.abs(a.astype(int)-b.astype(int))`. Two states of the same animation (stars not shown yet vs shown) differ by tens of thousands of pixels and still look like duplicates in a contact sheet.
 
 ## Project layout
 
@@ -179,7 +183,7 @@ Tool configuration a Python pipeline needs — `requirements.txt`, `pyproject.to
 
 | Script | Does |
 |---|---|
-| `scripts/make_music.py` | synthesises the background bed — four-chord progression, root bass, plucked arpeggio, noise breath at each chord change. Exact duration, 48 kHz stereo WAV, peak −6 dBFS. Flags: `--duration --out --tempo --mood`; see `references/RENDER.md` §8 |
+| `scripts/make_music.py` | synthesises the background bed — duration, 48 kHz stereo WAV, peak −6 dBFS. **Required: `--brief`**, free text describing the topic's musical mood; the brief decides scale, chord progression, timbre family, bass motion, arpeggio density, texture and tempo, and seeds the randomness. Optional `--tempo`, `--seed`. See `references/RENDER.md` §8 |
 
 ## Workflow
 
@@ -265,13 +269,13 @@ tipografinya.
 | Media | Lands at | Status | If the user has none |
 |---|---|---|---|
 | Voiceover recording | `audio/voiceover.wav` | Strongly recommended; it is the timing source | See "Without a voiceover" below |
-| Background music | `audio/music.wav` | Optional | `scripts/make_music.py` generates a chord-progression bed, or render silent |
+| Background music | `audio/music.wav` | Optional | `scripts/make_music.py --brief "<topic mood>"` generates a bespoke bed (write a fresh brief per film), or render silent |
 | Style reference video | `assets/reference.mp4` | Optional | Search Pinterest for `motion graphics` + topic keywords (stage 3); if nothing fits, design the style yourself |
 | Supporting images (1st, 2nd, …) | `assets/image-01.png`, `assets/image-02.png`, … | Optional | You find suitable images online, draw them in code, or both |
 | Screen orientation | — | Asked with the script in stage 1; repeat here only if still open | Default landscape 1920×1080 → cap 300 s; portrait 1080×1920 → cap 60 s |
 | Captions / subtitles | burned-in or `output/<slug>.srt` | Optional, asked once | No captions; offer the `.srt` in the delivery message |
 
-The table above is for your own reference. What reaches the user is the Indonesian block. Typography is **not** asked about — that is your call in stage 4, and if the right font is not installed you download it.
+The table above is for your own reference. What reaches the user is the Indonesian block. Typography is **not** asked about — that is your call in stage 4; the family is downloaded from Google Fonts into `assets/fonts/` (never taken from the machine).
 
 ### Stage 3 — Confirm readiness
 
@@ -372,7 +376,7 @@ Pilihannya:
    sendiri: latar [warna], aksen [warna], tipografi [jenis], gerak [sifat].
    Kalau Anda punya contoh tampilan yang lebih Anda suka, kirim saja.
    ```
-5. **Choose three type roles, one family each — do not let one family carry the whole film.** Display (the keyword) · meta (labels, indices) · accent (a handwritten annotation). Pick each from the topic's register and pick them as a set; a doodle topic takes rounded + handwriting + mono, an archival one takes serif + small-caps + mono. THEN: choose the family from the topic and the reference, never from what happens to be installed. Read the reference's type register first, then match a family to the topic's character. State the choice and reasoning in one sentence. If that font is not in the catalogue and not installed, search the internet for one that fits, download it, and verify it before writing scene code — recipe in `references/RENDER.md` §1. Never start building with a font that merely exists and then bend the design toward it; that order produces generic work.
+5. **Choose three type roles, one family each — do not let one family carry the whole film.** Display (the keyword) · meta (labels, indices) · accent (a handwritten annotation). Pick each from the topic's register and pick them as a set; a doodle topic takes rounded + handwriting + mono, an archival one takes serif + small-caps + mono. THEN: choose the family from the topic and the reference, never from what happens to be installed. Read the reference's type register first, then match a family to the topic's character. State the choice and reasoning in one sentence. Download that family from Google Fonts into the project's `assets/fonts/`, verify the file, then write scene code — recipe in `references/RENDER.md` §1. Never read a font from the machine. Never start building with a font that merely exists and then bend the design toward it; that order produces generic work.
 
    ```
    Tipografi: [nama keluarga huruf] untuk [peran], karena [alasan singkat

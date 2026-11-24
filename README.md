@@ -286,14 +286,15 @@ The measured numbers live with the rule they protect; the creative freedoms live
 
 ## 🎨 Fonts
 
-The catalogue ships **38 families across 8 registers** as a starting point, never a menu. If the topic needs typography that isn't there, the skill downloads it:
+No catalogue is shipped and no font is read from the machine. Every family a film uses is downloaded from Google Fonts into that project's `assets/fonts/` and referenced from there, so the film renders identically anywhere:
 
 ```bash
-curl -sL -o /tmp/font.ttf \
+mkdir -p assets/fonts
+curl -sL -o assets/fonts/Outfit.ttf \
   "https://github.com/google/fonts/raw/main/ofl/outfit/Outfit%5Bwght%5D.ttf"
 ```
 
-Then verifies it before use — under 10 KB means an HTML error page, not a font.
+Then verify it before use — under 10 KB means an HTML error page, not a font.
 
 ---
 

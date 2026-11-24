@@ -33,7 +33,7 @@ Techniques, chosen by context: text appearing with the spoken word, mask reveals
 Rules:
 - Choose fonts for **legibility first; weight and register follow the topic**. Modern-and-heavy is a common default, not a rule — an elegant serif for an editorial topic, a condensed archival face for history, or a script accent for a personal topic are equally legitimate when the topic calls for them. The real constraint: use real fonts through code (never text rendered by an image generator) so letters never break or turn into fake words.
 
-  **The font catalogue is not a menu.** The list in `RENDER.md` §"Fonts ready to use" is what happens to be installed, not the set of allowed choices. Your job is to pick typography that **fits the topic and the reference mood**, not the first row of the table. If the topic needs something missing (a food topic wanting a fat slab serif, an archive topic wanting a heavy condensed face, a tech topic wanting a narrow grotesk), **download it** — never settle for "close enough" just because it's installed. The download recipe and verification are in `RENDER.md` §1.
+  **There is no font catalogue and nothing is installed.** Every family a film uses is downloaded from Google Fonts into that project's `assets/fonts/` and referenced by path (`RENDER.md` §1). Your job is to pick typography that **fits the topic and the reference mood** — a fat slab serif for a food topic, a heavy condensed face for an archive topic, a narrow grotesk for a tech topic — then fetch exactly that. Never settle for a font because it happens to sit on the machine.
 
   The practical limit is coherence, not a count: **2–3 families is the range that usually holds together** as one system.
 - Preserve spelling and meaning exactly as scripted.
