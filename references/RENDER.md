@@ -811,6 +811,48 @@ Landscape has no box, but it does have a rule for readable text and captions: **
 
 An accent below 3:1 fails for primary text, and below 4.5:1 it fails for supporting text; the fix is to move the accent until the measured ratio clears, not to lower the threshold. When this gate rejects, change the colour, move the text onto a dark background, or place a solid panel behind it. On a dark palette the accent usually needs **lightening** — `fit_accent` in `GUIDE.md` §2 searches both directions for that reason.
 
+### Text inside a frame — centring gate
+
+A chip, badge, tag, button, sticker or card holds its text **centred both ways**:
+horizontally *and* vertically against its frame. Horizontal-only centring leaves
+the text floating high or low and reads as misplacement, however good the copy is.
+
+- **Browser (DOM/HTML):** let the frame centre its own content —
+  `display:flex; align-items:center; justify-content:center` — instead of nudging
+  the text with `transform`, `padding-top` or a hand-tuned offset. Then prove it:
+  `Range.getClientRects()` for the line count (one rect = one line) plus
+  `getBoundingClientRect()` of frame and text; centre-to-centre gap ≤ 2 px, and
+  top/bottom gaps equal within 3 px.
+- **PIL/skia (`render.py`):** never place text with a fixed nudge such as
+  `y + font.size * 0.34` — it is a guess that breaks at every new size or family.
+  Size the frame from the **glyph ink box** and centre the ink itself:
+
+  ```python
+  def ink_box(font, s, tracking=0.0):
+      """Real ink box of a string, relative to a text drawn at anchor 'lm'."""
+      x, xs, ys = 0.0, [], []
+      for ch in s:
+          b = font.getbbox(ch, anchor="lm")
+          xs += [x + b[0], x + b[2]]
+          ys += [b[1], b[3]]
+          x += font.getlength(ch) + tracking
+      return min(xs), min(ys), max(xs), max(ys)
+
+  ix0, iy0, ix1, iy1 = ink_box(font, label, tracking)
+  w = (ix1 - ix0) + 2 * pad_x          # frame from ink + symmetric padding
+  h = (iy1 - iy0) + 2 * pad_y
+  d.text((cx - (ix0 + ix1) / 2, cy - (iy0 + iy1) / 2),
+         label, font=font, anchor="lm")   # centre of ink on centre of frame
+  ```
+
+- **Prove it from pixels, not from the code that drew it.** Record each frame box
+  as it is drawn, then measure the rendered frame: ink bbox against frame bbox,
+  centre-to-centre ≤ 2 px and left/right, top/bottom gaps equal within 4 px.
+  Drop the rounded corners and a 4 px border before measuring, otherwise the
+  outline itself is counted as ink and every chip looks off-centre. Vision is not
+  a substitute — it calls a 12 px misalignment "centred".
+- A finding here is a defect, not taste: fix the geometry and re-render.
+
 ### Third gate: repetition pattern (flags, never rejects)
 
 This gate **does not judge**. It surfaces scenes with the same structure; you decide.
@@ -896,6 +938,8 @@ project folder stays free of build tooling. Run it from the project folder.
 
 It writes 48 kHz stereo 16-bit WAV at exactly `--duration` (so the bed never needs looping), peak −6 dBFS, 1.2 s fade-in, and a fade-out that lands on a floor instead of absolute zero.
 
+**Generate the bed longer than the video** — `--duration` ≈ video duration + 13 s, then `-t $DUR` in step 2. A bed written to the exact video length carries its own fade-out into the film's last second: measured, a 59 s bed on a 59 s video plus the mixing fade left the final 0.5 s at **−52.9 dB** and failed the tail floor; the same brief at 72 s measured **−30.1 dB**.
+
 The bed is a four-chord progression (two bars per chord): each chord gets a detuned two-voice pad, a root bass on beats 1 and 3, a plucked arpeggio on eighths that alternates pan, and a soft noise breath at each chord change.
 
 | Flag | Values | Choose by |
@@ -943,6 +987,8 @@ Use at most a few per video, always below the voiceover level, and tell the user
 - **Missing frames mid-sequence truncate the encode:** `-i work/frames/%05d.png` stops at the first gap, and `-pattern_type glob` reorders but does not fill. Measured: a 5-file sequence with `00002.png` missing encoded 2 frames. Assert contiguity before encoding (§6).
 - **SRT timestamps from float seconds misformat:** `int(round((s % 1) * 1000))` yields `",1000"` for 1.9996 s, which players reject. Convert to integer milliseconds first, then `divmod` (recipe in §3).
 - **`textbbox` with `anchor="mm"` at the origin returns HALF widths:** `bbox[2]` is the right edge measured from a centred origin, so using it as a word's width makes every following word overlap the previous one (measured: adjacent words scored 0.43–1.00 coverage and read as double-printed). Always take `b[2] - b[0]` for advances, totals, and tracking — per character as well.
+- **skia-python 144.1 API names differ from older examples:** `skia.RRect` has no `MakeLTRB` (use `skia.RRect.MakeRectXY(skia.Rect.MakeLTRB(...), rx, ry)`), and `Canvas` has no `clipCircle`/`clipRRect` (build a `skia.Path`, `addCircle`/`addRRect` it, then `clipPath`). Probe with `dir()` in a scratch script before writing scene code instead of fixing it after the first crashed frame.
+- **A shape drawn as bare lines does not read as its object:** a brush head rendered as ~30 stroked curves reads to a viewer as a porcupine or a broom. Draw the silhouette first — a filled, gradient-shaded mass with a rounded/dome tip — then the hairs on top at low alpha. Measured: it took two visual QC rounds to fix a brush that had only hairs.
 - **Missing glyphs render as tofu, not as nothing:** the ⚡ character does not exist in Archivo Black and rendered as a placeholder box mid-video (measured on an otherwise passing gate run — the pixel gates do not catch it). Draw symbols (lightning, arrows, badges) as polygons/paths in code; never put emoji or symbol codepoints through a display font.
 - **Decorations must never cross a text band:** a charging cable drawn straight through a centred label, and a connector plug landing on a chip, both measured. When a diagram needs a line where text sits, move the label (e.g. split it into two left-anchored lines beside the line's axis), never layer text over the stroke.
 - **Chips and badges: build the box from the measured content, not the reverse:** box = padding + icon + gap + text width, the whole group centred on its anchor. Hand-placing the box and the text separately measured off-centre by tens of pixels. Also: a keyword inside a chip is a *badge*, not primary text — set it in the supporting tier (≥2.5% cap height), not the primary tier, or it dwarfs the card around it.
