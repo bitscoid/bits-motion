@@ -478,7 +478,7 @@ Bentuk lengkap:
 # VIDEO  : <slug>/output/<slug>.mp4
 # CHANNEL: BITS Style | BITS Tech | BITS Living
 # DURASI : <detik, satu desimal>
-# STATUS : SIAP | PERLU-REVIEW
+# STATUS : SIAP   ← hanya "SIAP" persis yang otomatis masuk Buffer; PERLU-REVIEW menahan
 # UPDATE : <YYYY-MM-DD> (<apa yang berubah>)
 
 === TikTok
